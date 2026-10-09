@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>chip-backend-ai · LLM 驱动宏单元放置架构</title>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#1e293b; --panel2:#273449; --line:#334155;
+    --text:#e2e8f0; --muted:#94a3b8; --accent:#38bdf8; --accent2:#22d3ee;
+    --ok:#22c55e; --warn:#f59e0b; --err:#ef4444; --info:#a78bfa;
+    --layer1:#a78bfa; --layer2:#22d3ee; --layer3:#facc15; --layer4:#34d399;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"Segoe UI",Helvetica,"PingFang SC","Microsoft YaHei",sans-serif;
+       background:var(--bg);color:var(--text);line-height:1.6}
+  header{padding:28px 40px;background:linear-gradient(135deg,#0b1224 0%,#172554 100%);
+         border-bottom:1px solid var(--line)}
+  header h1{margin:0;font-size:24px}
+  header p{margin:8px 0 0;color:var(--muted);font-size:14px;max-width:980px}
+  header .tldr{margin-top:14px;padding:12px 16px;background:rgba(56,189,248,.1);
+               border-left:3px solid var(--accent);border-radius:4px;font-size:14.5px;color:#cbd5e1}
+  header .tldr b{color:var(--accent)}
+  nav.tabs{display:flex;flex-wrap:wrap;gap:6px;padding:14px 40px;background:#0b1224;
+           border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
+  nav.tabs button{background:transparent;color:var(--muted);border:1px solid transparent;
+                  padding:8px 14px;border-radius:6px;cursor:pointer;font-size:14px;font-family:inherit}
+  nav.tabs button:hover{color:var(--text);background:#1e293b}
+  nav.tabs button.active{color:var(--accent);background:#0f1f3a;border-color:var(--accent)}
+  main{padding:30px 40px;max-width:1280px;margin:0 auto}
+  section{display:none;animation:fade .25s ease}
+  section.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  h2{font-size:20px;border-left:4px solid var(--accent);padding-left:12px;margin-top:0}
+  h3{font-size:16px;color:var(--accent2);margin-top:24px}
+  p{color:#cbd5e1}
+  .muted{color:var(--muted);font-size:13.5px}
+
+  .grid{display:grid;gap:14px}
+  .grid.cols-2{grid-template-columns:repeat(auto-fit,minmax(360px,1fr))}
+  .grid.cols-3{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+        padding:16px 18px;transition:.2s}
+  .card:hover{border-color:var(--accent)}
+  .card h4{margin:0 0 8px;color:var(--accent);font-size:15px}
+  .card .tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;
+             background:#334155;color:var(--text);margin-right:6px}
+  .tag.ok{background:#14532d;color:#bbf7d0}
+  .tag.warn{background:#7c2d12;color:#fed7aa}
+  .tag.err{background:#7f1d1d;color:#fecaca}
+  .tag.info{background:#3730a3;color:#c7d2fe}
+
+  pre{background:#0b1224;border:1px solid var(--line);border-radius:8px;
+      padding:14px 16px;overflow:auto;font-size:12.5px;line-height:1.6;color:#cbd5e1;margin:8px 0}
+  code{font-family:"SF Mono",Consolas,monospace;color:#fbbf24;font-size:13px}
+  pre code{color:#cbd5e1;font-size:12.5px}
+
+  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:14px}
+  th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  th{background:#0b1224;color:var(--accent2);font-weight:600}
+  tr:hover td{background:#1a2540}
+
+  details{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+          padding:0;margin:10px 0;overflow:hidden}
+  details summary{padding:12px 16px;cursor:pointer;font-weight:600;color:var(--accent);
+                  background:var(--panel2);list-style:none}
+  details summary::-webkit-details-marker{display:none}
+  details summary::before{content:"▸ ";color:var(--accent);transition:.15s}
+  details[open] summary::before{content:"▾ "}
+  details[open] summary{border-bottom:1px solid var(--line)}
+  details > div{padding:14px 18px}
+
+  .note{background:#1e293b;border-left:3px solid var(--warn);padding:10px 14px;
+        border-radius:4px;margin:14px 0;font-size:13.5px;color:#fde68a}
+  .note strong{color:var(--warn)}
+  .note.ok{border-left-color:var(--ok);color:#bbf7d0}
+  .note.ok strong{color:var(--ok)}
+  .note.info{border-left-color:var(--info);color:#c7d2fe}
+  .note.info strong{color:var(--info)}
+
+  /* === Architecture diagram === */
+  .arch{display:flex;gap:20px;margin:24px 0}
+  .arch-stack{flex:0 0 360px;display:flex;flex-direction:column;gap:0}
+  .arch-stack .layer{background:var(--panel);border:2px solid var(--line);
+                     border-radius:10px;padding:14px 16px;cursor:pointer;transition:.2s;
+                     position:relative}
+  .arch-stack .layer:hover{transform:translateX(4px);background:var(--panel2)}
+  .arch-stack .layer.active{border-color:var(--accent);box-shadow:0 0 14px rgba(56,189,248,.3)}
+  .arch-stack .layer .label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+  .arch-stack .layer .name{font-size:15px;font-weight:600;margin-top:3px}
+  .arch-stack .layer .role{font-size:12.5px;color:var(--muted);margin-top:4px}
+  .arch-stack .layer .badge{position:absolute;top:14px;right:14px;font-size:11px;padding:2px 8px;
+                            border-radius:10px;background:#334155;color:var(--text)}
+  .arch-stack .layer[data-layer="1"]{border-left:5px solid var(--layer1)}
+  .arch-stack .layer[data-layer="2"]{border-left:5px solid var(--layer2)}
+  .arch-stack .layer[data-layer="3"]{border-left:5px solid var(--layer3)}
+  .arch-stack .layer[data-layer="4"]{border-left:5px solid var(--layer4)}
+  .arch-stack .arrow{text-align:center;color:var(--accent);font-size:18px;padding:4px 0;
+                     font-family:monospace}
+  .arch-detail{flex:1;background:var(--panel);border:1px solid var(--accent);border-radius:10px;
+               padding:18px 22px;min-height:300px}
+  .arch-detail h3{margin:0 0 12px;color:var(--accent)}
+  .arch-detail .responsibility{margin:8px 0}
+  .arch-detail .responsibility b{color:var(--ok)}
+  .arch-detail .nope b{color:var(--err)}
+
+  /* === Pipeline stepper === */
+  .stepper{display:flex;gap:6px;margin:18px 0;flex-wrap:wrap}
+  .stepper .pill{flex:1;min-width:140px;padding:12px 14px;border-radius:8px;
+                 background:var(--panel);border:1px solid var(--line);cursor:pointer;
+                 transition:.2s;text-align:center;font-size:13px}
+  .stepper .pill:hover{border-color:var(--accent2)}
+  .stepper .pill.active{background:#0f1f3a;border-color:var(--accent);color:var(--accent);
+                        box-shadow:0 0 10px rgba(56,189,248,.25)}
+  .stepper .pill b{display:block;font-size:12px;color:var(--muted);margin-bottom:3px}
+  .stepper .pill.active b{color:var(--accent2)}
+  .step-content{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+                padding:18px 22px;margin-top:6px}
+  .step-content h3{margin-top:0}
+  .step-nav{display:flex;justify-content:space-between;margin-top:18px;gap:10px}
+  .step-nav button{padding:9px 18px;background:var(--panel2);color:var(--text);
+                   border:1px solid var(--line);border-radius:6px;cursor:pointer;font-family:inherit;
+                   font-size:14px}
+  .step-nav button:hover{border-color:var(--accent);color:var(--accent)}
+  .step-nav button:disabled{opacity:.4;cursor:not-allowed}
+
+  .who{display:inline-block;padding:3px 9px;border-radius:6px;font-size:11.5px;font-weight:600;
+       margin-right:6px}
+  .who.llm{background:rgba(167,139,250,.15);color:var(--layer1);border:1px solid var(--layer1)}
+  .who.dsl{background:rgba(34,211,238,.15);color:var(--layer2);border:1px solid var(--layer2)}
+  .who.py{background:rgba(250,204,21,.15);color:var(--layer3);border:1px solid var(--layer3)}
+  .who.innovus{background:rgba(52,211,153,.15);color:var(--layer4);border:1px solid var(--layer4)}
+
+  /* === comparison === */
+  .compare{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0}
+  .compare .col{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 20px}
+  .compare .col.bad{border-top:3px solid var(--err)}
+  .compare .col.good{border-top:3px solid var(--ok)}
+  .compare .col h4{margin:0 0 10px;font-size:15px}
+  .compare .col.bad h4{color:var(--err)}
+  .compare .col.good h4{color:var(--ok)}
+  .compare ul{margin:6px 0;padding-left:18px;color:#cbd5e1;font-size:13.5px}
+  .compare li{margin-bottom:5px}
+
+  /* hero / question */
+  .hero-q{background:var(--panel);border:1px solid var(--err);border-radius:10px;
+          padding:20px 24px;margin:14px 0}
+  .hero-q h3{margin-top:0;color:var(--err)}
+  .hero-q ul{color:#cbd5e1;font-size:14px;line-height:1.8}
+  .hero-a{background:var(--panel);border:1px solid var(--ok);border-radius:10px;
+          padding:20px 24px;margin:14px 0}
+  .hero-a h3{margin-top:0;color:var(--ok)}
+
+  .layer-tag{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  .layer-tag.l1{background:var(--layer1)}
+  .layer-tag.l2{background:var(--layer2)}
+  .layer-tag.l3{background:var(--layer3)}
+  .layer-tag.l4{background:var(--layer4)}
+
+  footer{padding:20px 40px;color:var(--muted);font-size:12.5px;border-top:1px solid var(--line);
+         text-align:center;margin-top:30px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>LLM 驱动宏单元放置 · 架构方案</h1>
+  <p>面向疑问 <em>"LLM 处理坐标差、空间推理弱，能搞定 floorplan 吗？"</em> 给出的明确架构答复 ·
+     聚焦 Cadence Innovus，不涉及 SA / ILP / 自研求解器</p>
+  <div class="tldr">
+    <b>一句话结论：</b>本架构里 <b>LLM 从头到尾不计算任何坐标</b>。它只生成"约束 DSL"（意图层），
+    几何由 Innovus 自带的 <code>place_design</code> 在受约束的可行域里求解。
+    LLM 弱在 2D 推理 —— 我们就不让它做 2D 推理。
+  </div>
+</header>
+
+<nav class="tabs">
+  <button data-tab="question" class="active">核心疑问</button>
+  <button data-tab="answer">核心答复</button>
+  <button data-tab="architecture">三层架构</button>
+  <button data-tab="pipeline">流程演示</button>
+  <button data-tab="compare">naive vs 本方案</button>
+  <button data-tab="innovus-api">Innovus 约束 API</button>
+  <button data-tab="loop">闭环修正</button>
+  <button data-tab="faq">FAQ</button>
+</nav>
+
+<main>
+
+<!-- =================== 核心疑问 =================== -->
+<section id="question" class="active">
+  <h2>1 · 核心疑问的复述</h2>
+  <p>你提出的质疑非常具体，可以拆成四条独立论断。它们都<strong>部分正确</strong>，所以必须分别回应：</p>
+
+  <div class="hero-q">
+    <h3>有人说：宏单元放置是 LLM 比较难搞的事情</h3>
+    <ul>
+      <li><b>论断 A：</b>这是带约束的二维布局优化问题，本质需要空间推理 + 多目标权衡（时序、拥塞、电源、面积）。</li>
+      <li><b>论断 B：</b>LLM 处理坐标的能力非常差，经常给出宏重叠、超出 die、违反对称的坐标。</li>
+      <li><b>论断 C：</b>即使用 chain-of-thought，LLM 也很难在脑子里维护一个二维网格状态。</li>
+      <li><b>论断 D：</b>这正是 Google 2021 Nature 论文用 RL 而不是 LLM 的原因。</li>
+    </ul>
+  </div>
+
+  <h3>我对这四条论断的判定</h3>
+  <table>
+    <tr><th>论断</th><th>判定</th><th>关键澄清</th></tr>
+    <tr>
+      <td>A · 这是 2D 约束优化</td>
+      <td><span class="tag ok">完全正确</span></td>
+      <td>事实陈述。但"问题是 2D 优化"不等于"必须由 2D 推理者求解" —— 几何求解可以交给专门工具。</td>
+    </tr>
+    <tr>
+      <td>B · LLM 给坐标会错</td>
+      <td><span class="tag ok">经验上正确</span></td>
+      <td>所以本架构里 LLM 不被要求输出坐标 —— 这条论断只能否定"naive 让 LLM 直出坐标"那一种方案。</td>
+    </tr>
+    <tr>
+      <td>C · CoT 维护不了 2D 状态</td>
+      <td><span class="tag warn">部分正确</span></td>
+      <td>Transformer 序列化注意力确实无原生空间状态；但状态可以放在外部（tool 调用），LLM 只做增量决策。</td>
+    </tr>
+    <tr>
+      <td>D · Google 用 RL 所以 LLM 不行</td>
+      <td><span class="tag err">非充分论证</span></td>
+      <td>那篇论文 2020 年投稿，没有现代 LLM；且本身被 Cheng et al. 2023 质疑过可复现性。"当年 Google 没选 LLM" ≠ "今天 LLM 解决不了"。RL 与 LLM 不互斥 —— 成熟系统会让 LLM 做语义层、RL/算法做几何层。</td>
+    </tr>
+  </table>
+
+  <div class="note info">
+    <strong>关键洞察：</strong>批评打中的只是 <em>"LLM 直接生成坐标"</em> 这一种 naive 用法。
+    本架构的核心设计就是<strong>把 LLM 从几何层撤出来</strong>，让它只工作在意图层和约束层。
+  </div>
+</section>
+
+<!-- =================== 核心答复 =================== -->
+<section id="answer">
+  <h2>2 · 一句话答复（再展开三层）</h2>
+
+  <div class="hero-a">
+    <h3>本架构如何回避论断 B/C：</h3>
+    <p style="font-size:15px;margin:0">
+      LLM 输出的是 <b>结构化约束（DSL）</b>，比如 <code>{group: bank0, topology: 4x4_array, pitch: [120,80]}</code>、
+      <code>{ctrl above bank0 by 30um}</code>。<br>
+      <b>所有坐标计算</b>由两类执行者完成：<br>
+      &nbsp;&nbsp;① <span class="who py">Python 适配器</span>：规则性几何（如阵列循环 <code>x = origin + i*pitch</code>），这是死代码，不是优化；<br>
+      &nbsp;&nbsp;② <span class="who innovus">Innovus place_design</span>：在约束划定的可行域内做真正的 2D 优化（wirelength、congestion、std cell legalization）。<br>
+      LLM 全程没有写过任何坐标数字。
+    </p>
+  </div>
+
+  <h3>类比：你不会让 LLM 算 23 位乘法</h3>
+  <p>LLM 算大数乘法会错得离谱，但没人因此说 "LLM 不能用于数学" ——
+  正确用法是让它<b>调计算器或写 Python</b>，而不是<b>当计算器</b>。floorplan 是一样的：</p>
+
+  <div class="grid cols-2">
+    <div class="card">
+      <h4>错误用法 <span class="tag err">naive</span></h4>
+      <p>把 die 尺寸和宏列表丢给 LLM，让它直接输出 <code>placeInstance bank_0 234 567 R0</code>。</p>
+      <p class="muted">这种用法验证了论断 B/C —— 宏一多就重叠 / 出界 / 违反对称。</p>
+    </div>
+    <div class="card">
+      <h4>本方案 <span class="tag ok">constraint-based</span></h4>
+      <p>LLM 输出约束 DSL；适配器翻译成 Innovus TCL；Innovus 自己算坐标。</p>
+      <p class="muted">LLM 弱项被完全绕开 —— 它做擅长的语义翻译，几何交给擅长的求解器。</p>
+    </div>
+  </div>
+
+  <div class="note ok">
+    <strong>这是后续所有内容的总线索：</strong>无论看到 LLM 还是 Python 还是 TCL，时刻问一个问题 ——
+    <em>"这一步在算坐标吗？如果是，谁在算？"</em> 答案永远不应该是 LLM。
+  </div>
+</section>
+
+<!-- =================== 三层架构 =================== -->
+<section id="architecture">
+  <h2>3 · 三层架构（点击左侧层级查看职责）</h2>
+  <p class="muted">从用户意图到 Innovus 最终 DEF，整个流水线被严格分成 4 层。<b>关键不变量：</b>越往上越接近"意思"，越往下越接近"几何"；LLM 只允许待在上面两层。</p>
+
+  <div class="arch">
+    <div class="arch-stack">
+      <div class="layer active" data-layer="1" onclick="selectLayer(1)">
+        <div class="label">Layer 1 · INTENT</div>
+        <div class="name">LLM（spec-agent + floorplan-agent）</div>
+        <div class="role">理解人类意图 → 结构化约束</div>
+        <span class="badge">语义层</span>
+      </div>
+      <div class="arrow">↓ 生成 YAML</div>
+      <div class="layer" data-layer="2" onclick="selectLayer(2)">
+        <div class="label">Layer 2 · CONSTRAINT</div>
+        <div class="name">macro_constraints.yaml（DSL）</div>
+        <div class="role">可审计、可 diff、可回归的中间产物</div>
+        <span class="badge">协议层</span>
+      </div>
+      <div class="arrow">↓ Python 适配器（死代码）</div>
+      <div class="layer" data-layer="3" onclick="selectLayer(3)">
+        <div class="label">Layer 3 · TCL SETUP</div>
+        <div class="name">innovus_adapter.py → setup.tcl</div>
+        <div class="role">规则坐标 + 约束 API 调用 + place_design</div>
+        <span class="badge">绑定层</span>
+      </div>
+      <div class="arrow">↓ Innovus 内置 placer</div>
+      <div class="layer" data-layer="4" onclick="selectLayer(4)">
+        <div class="label">Layer 4 · GEOMETRY</div>
+        <div class="name">Innovus place_design / refine_macro_place</div>
+        <div class="role">真正的 2D 优化、wirelength、congestion</div>
+        <span class="badge">求解层</span>
+      </div>
+    </div>
+
+    <div class="arch-detail" id="arch-detail">
+      <!-- filled by JS -->
+    </div>
+  </div>
+
+  <h3>层级间的契约（contract）</h3>
+  <table>
+    <tr><th>边界</th><th>契约形式</th><th>检验方式</th></tr>
+    <tr>
+      <td>L1 → L2</td>
+      <td>YAML schema (<code>templates/macro_constraints_template.yaml</code>)</td>
+      <td>jsonschema 校验；缺字段直接拒收</td>
+    </tr>
+    <tr>
+      <td>L2 → L3</td>
+      <td>Python 适配器函数签名（dataclass in, str out）</td>
+      <td>单元测试：固定 DSL → 固定 TCL diff</td>
+    </tr>
+    <tr>
+      <td>L3 → L4</td>
+      <td>Innovus TCL 命令集（标准 EDA API）</td>
+      <td>Innovus 语法检查；place_design 报错即失败</td>
+    </tr>
+    <tr>
+      <td>L4 → 反馈</td>
+      <td><code>eval_result.yaml</code>（congestion / violations / 截图）</td>
+      <td>对照 stage spec 的 acceptance criteria</td>
+    </tr>
+  </table>
+
+  <div class="note">
+    <strong>切勿做的事：</strong>不要让 LLM 直接生成 Layer 3 的 TCL，更不要让它生成 <code>placeInstance bank_0 234 567</code> 这种带具体坐标的命令。
+    一旦 LLM 写出了坐标数字，本架构就退化成被论断 B/C 否定的 naive 方案。
+  </div>
+</section>
+
+<!-- =================== 流程演示 =================== -->
+<section id="pipeline">
+  <h2>4 · 真实例子：从需求到 DEF</h2>
+  <p class="muted">同一份需求（"4 个 16MB DRAM bank 排成 2×2、控制器在北边、IO 走南边"）逐层落到 Innovus，
+    点击 step pill 切换查看每一层的产物与责任人。</p>
+
+  <div class="stepper" id="stepper">
+    <div class="pill active" data-step="0" onclick="selectStep(0)"><b>Step 0</b>用户需求</div>
+    <div class="pill" data-step="1" onclick="selectStep(1)"><b>Step 1</b>LLM 产 DSL</div>
+    <div class="pill" data-step="2" onclick="selectStep(2)"><b>Step 2</b>Python 算规则坐标</div>
+    <div class="pill" data-step="3" onclick="selectStep(3)"><b>Step 3</b>TCL setup</div>
+    <div class="pill" data-step="4" onclick="selectStep(4)"><b>Step 4</b>Innovus 求解</div>
+    <div class="pill" data-step="5" onclick="selectStep(5)"><b>Step 5</b>反馈与修正</div>
+  </div>
+
+  <div class="step-content" id="step-content">
+    <!-- filled by JS -->
+  </div>
+
+  <div class="step-nav">
+    <button id="prev-step" onclick="prevStep()">← 上一步</button>
+    <button id="next-step" onclick="nextStep()">下一步 →</button>
+  </div>
+</section>
+
+<!-- =================== Compare =================== -->
+<section id="compare">
+  <h2>5 · naive 方案 vs 本方案</h2>
+  <p class="muted">同样让"LLM 帮忙做 floorplan"，下面两种架构的命运完全不同。</p>
+
+  <div class="compare">
+    <div class="col bad">
+      <h4>✗ naive：LLM 直接吐坐标</h4>
+      <pre><code># LLM prompt:
+# "die 800x600, 把 4 个 200x150 的
+#  bank 排成 2x2, 不要重叠"
+
+# LLM 输出:
+placeInstance bank_0 100 100 R0
+placeInstance bank_1 350 100 R0
+placeInstance bank_2 100 320 R0
+placeInstance bank_3 350 350 R0  ← 不对齐
+#    ↑ 还可能重叠、出界、忘对称</code></pre>
+      <ul>
+        <li>坐标由 LLM 凭"感觉"生成</li>
+        <li>宏数量 > 20 急剧恶化</li>
+        <li>无法表达"在 X 北边"这种<b>相对约束</b></li>
+        <li>无法利用 Innovus placer 的 wirelength 优化</li>
+        <li>congestion / timing 完全没考虑</li>
+        <li><b>验证了论断 B / C</b></li>
+      </ul>
+    </div>
+
+    <div class="col good">
+      <h4>✓ 本方案：LLM 产约束，Innovus 算坐标</h4>
+      <pre><code># LLM 输出（DSL）:
+groups:
+  - {name: dram, macros: [bank_0..3],
+     topology: 2x2_array,
+     pitch_um: [220,180], origin: [100,100]}
+relative:
+  - {a: ctrl, b: dram, relation: above,
+     channel_um: 30}
+
+# 适配器 → TCL:
+placeInstance bank_0 100 100 R0 -fixed
+placeInstance bank_1 320 100 R0 -fixed
+placeInstance bank_2 100 280 R0 -fixed
+placeInstance bank_3 320 280 R0 -fixed
+createRegion ctrl_r 100 490 540 600
+addToRegion ctrl_r ctrl
+place_design -concurrent_macros  ← Innovus 干活</code></pre>
+      <ul>
+        <li>LLM 完全不写坐标 → 论断 B/C 不适用</li>
+        <li>2×2 阵列坐标由 Python <em>循环加法</em>算（非优化）</li>
+        <li>ctrl 位置由 Innovus 在 region 内挑最优</li>
+        <li>std cell legalization、wirelength 优化全部由 Innovus 完成</li>
+        <li>DSL 可 diff、可回归、可被人类审查</li>
+        <li>退一步：即使 LLM 完全摆烂随机生成 DSL，Innovus 也会拒绝非法约束 —— <b>有 fail-fast</b></li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>性能与可扩展性对比</h3>
+  <table>
+    <tr><th>维度</th><th>naive</th><th>本方案</th></tr>
+    <tr><td>宏数量上限</td><td>≤ 10 凑合</td><td>无明显上限（取决于 Innovus）</td></tr>
+    <tr><td>支持相对约束（"X 在 Y 北边"）</td><td>不支持</td><td>原生支持</td></tr>
+    <tr><td>支持对称 / 对齐 / abutment</td><td>勉强（很容易破坏）</td><td>via createRegion / placeInstance -fixed</td></tr>
+    <tr><td>wirelength 优化</td><td>无</td><td>Innovus placer 内建</td></tr>
+    <tr><td>congestion 反馈</td><td>无</td><td>place_design 后 report_congestion</td></tr>
+    <tr><td>可审计</td><td>差（坐标黑盒）</td><td>好（DSL 可 diff）</td></tr>
+    <tr><td>可回归</td><td>难（LLM 输出不稳定）</td><td>易（适配器是死代码）</td></tr>
+    <tr><td>失败模式</td><td>静默错误（坐标看起来对，其实重叠）</td><td>fail-fast（Innovus 报错）</td></tr>
+  </table>
+</section>
+
+<!-- =================== Innovus API =================== -->
+<section id="innovus-api">
+  <h2>6 · Innovus 约束 API · 适配器能用的"积木"</h2>
+  <p class="muted">DSL 翻译的目的地，就是下面这些 Innovus 原生命令。LLM 不需要知道它们的语法 —— 适配器知道就行。</p>
+
+  <h3>放置类</h3>
+  <table>
+    <tr><th>命令</th><th>用途</th><th>典型示例</th></tr>
+    <tr>
+      <td><code>placeInstance</code></td>
+      <td>把宏固定在精确坐标</td>
+      <td><code>placeInstance bank_0 100 100 R0 -fixed</code></td>
+    </tr>
+    <tr>
+      <td><code>place_design</code></td>
+      <td>触发 Innovus placer（含宏 + std cell）</td>
+      <td><code>place_design -concurrent_macros</code></td>
+    </tr>
+    <tr>
+      <td><code>refine_macro_place</code></td>
+      <td>place_design 后微调宏位置</td>
+      <td><code>refine_macro_place</code></td>
+    </tr>
+  </table>
+
+  <h3>区域类（可行域）</h3>
+  <table>
+    <tr><th>命令</th><th>用途</th><th>典型示例</th></tr>
+    <tr>
+      <td><code>createRegion</code></td>
+      <td>软约束：尽量在区域内</td>
+      <td><code>createRegion ctrl_r 100 490 540 600</code></td>
+    </tr>
+    <tr>
+      <td><code>createFence</code></td>
+      <td>硬约束：必须在区域内</td>
+      <td><code>createFence sym_r 0 0 400 600</code></td>
+    </tr>
+    <tr>
+      <td><code>addToRegion / addToFence</code></td>
+      <td>把实例绑定到区域 / 围栏</td>
+      <td><code>addToRegion ctrl_r ctrl</code></td>
+    </tr>
+    <tr>
+      <td><code>defineProximityGroup</code></td>
+      <td>声明一组实例应靠近</td>
+      <td><code>defineProximityGroup bank_grp -insts {bank_0 bank_1 …}</code></td>
+    </tr>
+  </table>
+
+  <h3>禁区与边距类</h3>
+  <table>
+    <tr><th>命令</th><th>用途</th><th>典型示例</th></tr>
+    <tr>
+      <td><code>createPlaceBlockage</code></td>
+      <td>禁止放置的多边形区域</td>
+      <td><code>createPlaceBlockage -box {50 50 150 150} -type hard</code></td>
+    </tr>
+    <tr>
+      <td><code>createPlaceHalo</code></td>
+      <td>宏周围的隔离带</td>
+      <td><code>createPlaceHalo -allMacros -halo 10 10 10 10</code></td>
+    </tr>
+    <tr>
+      <td><code>createRouteHalo</code></td>
+      <td>布线层面的 halo</td>
+      <td><code>createRouteHalo -allMacros -space 5</code></td>
+    </tr>
+  </table>
+
+  <h3>引脚与边界类</h3>
+  <table>
+    <tr><th>命令</th><th>用途</th><th>典型示例</th></tr>
+    <tr>
+      <td><code>editPin</code></td>
+      <td>指定 IO pin 所在边</td>
+      <td><code>editPin -pin {io_*} -side bottom -spread</code></td>
+    </tr>
+    <tr>
+      <td><code>setObjFPlanBox</code></td>
+      <td>修改 die / core 框</td>
+      <td><code>setObjFPlanBox Module top 0 0 800 600</code></td>
+    </tr>
+  </table>
+
+  <h3>验证类（Innovus 给反馈给 LLM 用）</h3>
+  <table>
+    <tr><th>命令</th><th>用途</th><th>反馈给 LLM 的形式</th></tr>
+    <tr>
+      <td><code>check_floorplan</code></td>
+      <td>检查重叠 / 出界 / 非法约束</td>
+      <td>错误数 + 前 N 条具体违反</td>
+    </tr>
+    <tr>
+      <td><code>report_congestion</code></td>
+      <td>拥塞报告 + 热力图</td>
+      <td>峰值 H/V overflow + map 截图</td>
+    </tr>
+    <tr>
+      <td><code>report_timing -early</code></td>
+      <td>pre-CTS 时序</td>
+      <td>WNS / TNS + top 5 violating path</td>
+    </tr>
+  </table>
+
+  <div class="note info">
+    <strong>设计原则：</strong>适配器只用"声明性"命令（createRegion / createFence / createPlaceHalo），
+    避免"过程性"命令（一步步 moveInstance）。<b>声明性命令 = 把决策权留给 Innovus 的优化器</b>。
+  </div>
+</section>
+
+<!-- =================== Loop =================== -->
+<section id="loop">
+  <h2>7 · 闭环修正（Layer 4 → Layer 1 的反馈）</h2>
+  <p>这是第二个让 LLM 有用的关键 —— 当 Innovus 跑完 <code>place_design</code> 后报 congestion，
+    LLM 不需要"看着 2D 网格在脑子里推理"，它只需要看一张<b>压缩后的反馈摘要</b>，然后修改 DSL 里的几个参数。</p>
+
+  <h3>反馈包结构（eval_result.yaml 节选）</h3>
+  <pre><code>stage: floorplan
+status: needs_revision
+metrics:
+  congestion:
+    h_overflow_peak: 1.8   # > 1.0 即过拥塞
+    v_overflow_peak: 0.9
+    hotspot_region: {x: 320, y: 280, w: 100, h: 80}   # ← bank_3 周围
+  timing_pre_cts:
+    wns_ns: -0.42
+    tns_ns: -3.1
+  violations:
+    overlap_count: 0
+    out_of_die: 0
+attachments:
+  congestion_map: stages/floorplan/run_001/cong_map.png
+  density_map: stages/floorplan/run_001/density.png
+hints_for_llm:                # 适配器预先压缩好的关键事实
+  - "Hotspot at bank_3 area; channel between bank_2 and bank_3 is 20um (too tight)"
+  - "ctrl region narrowness causes long routes to bank_0"</code></pre>
+
+  <h3>LLM 在反馈循环里的"动作"是什么？</h3>
+  <div class="grid cols-2">
+    <div class="card">
+      <h4>不是 ✗</h4>
+      <p>不是让 LLM 看着 congestion map 在脑子里搬宏。LLM 看不准像素坐标。</p>
+    </div>
+    <div class="card">
+      <h4>而是 ✓</h4>
+      <p>LLM 看 <code>hints_for_llm</code> 里的<b>事实文本</b>，决定<b>修改 DSL 里的哪个参数</b>：
+        例如把 channel 从 20um 改成 40um，或者把 ctrl 的 region 加宽。</p>
+    </div>
+  </div>
+
+  <h3>典型修正动作（DSL 级别）</h3>
+  <table>
+    <tr><th>问题</th><th>LLM 的修正</th><th>结果</th></tr>
+    <tr>
+      <td>bank 间 channel 过窄 → routing 拥塞</td>
+      <td>把 <code>pitch_um</code> 从 <code>[220,180]</code> 改为 <code>[240,200]</code></td>
+      <td>适配器重新算坐标，bank 间隙变大</td>
+    </tr>
+    <tr>
+      <td>ctrl 离 bank_0 太远</td>
+      <td>把 <code>{ctrl above dram}</code> 改成 <code>{ctrl above bank_0 abutment}</code></td>
+      <td>适配器加 <code>placeInstance ctrl -fixed</code></td>
+    </tr>
+    <tr>
+      <td>某 region 内 std cell 密度过高</td>
+      <td>在 DSL 加 <code>blockage: {box: ..., type: partial, density: 0.5}</code></td>
+      <td>适配器加 <code>createPlaceBlockage -density 0.5</code></td>
+    </tr>
+  </table>
+
+  <div class="note ok">
+    <strong>循环的关键设计：</strong>每次迭代 LLM 改的都是 <b>少量、命名清晰</b> 的 DSL 参数 ——
+    这是它擅长的"局部语义编辑"，不是它弱势的"全局空间重规划"。
+  </div>
+</section>
+
+<!-- =================== FAQ =================== -->
+<section id="faq">
+  <h2>8 · FAQ</h2>
+
+  <details open>
+    <summary>Q1 · 那 LLM 在这个方案里到底"聪明"在哪？</summary>
+    <div>
+      <p>LLM 的价值在两个地方，都跟坐标无关：</p>
+      <ol>
+        <li><b>把模糊人类需求翻译成结构化约束</b>。
+          "排成阵列、留 channel、对称、和 PG 网络对齐" 这些半结构化的意图，传统脚本写不动，模板覆盖不全 —— LLM 在这里是最合适的工具。</li>
+        <li><b>在闭环里读反馈、做增量调整</b>。
+          看到 "bank_3 周围拥塞、channel 20um" 这种文本事实，LLM 知道"应该把 pitch 加大" —— 这是常识级推理，不是空间几何推理。</li>
+      </ol>
+      <p>它绝不算坐标、绝不维护 2D 状态、绝不和 Innovus 的 placer 抢活干。</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>Q2 · 如果用户直接说"把 bank_0 放在 (234, 567)"怎么办？</summary>
+    <div>
+      <p>这是合法的 —— DSL 支持显式坐标：
+      <code>fixed_placement: [{inst: bank_0, x: 234, y: 567}]</code> —— 适配器原样翻译成
+      <code>placeInstance bank_0 234 567 R0 -fixed</code>。<b>是用户在算坐标，不是 LLM。</b>
+      LLM 在这里只做"把自然语言识别成 fixed_placement 条目"这件小事。</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>Q3 · 如果 DSL 自相矛盾（如 ctrl 同时被要求在北边又在南边）怎么办？</summary>
+    <div>
+      <p>三道防线：</p>
+      <ol>
+        <li><b>schema 校验</b>：YAML schema 检查字段类型和必填项。</li>
+        <li><b>适配器语义检查</b>：翻译前先做 cross-rule 检测（同一 instance 不能被两个矛盾的 relative 约束）。</li>
+        <li><b>Innovus 兜底</b>：<code>check_floorplan</code> 会报"区域内放不下" / "超出 die" 等错误。</li>
+      </ol>
+      <p>任何一道失败，整个 stage 标记 <code>failed</code>，反馈 hints_for_llm，触发下一轮迭代。</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>Q4 · 这个方案的成本在哪？比 naive 多花了什么？</summary>
+    <div>
+      <p>主要成本是<b>一次性</b>的：</p>
+      <ul>
+        <li>定义 DSL schema（一次）—— 估计 1~2 周设计 + 评审</li>
+        <li>写 Innovus 适配器（一次）—— 估计 2~3 周，覆盖 DSL 所有原语</li>
+        <li>积累反馈摘要模板（持续）—— 每次发现新的失败模式，加一条 hint 规则</li>
+      </ul>
+      <p>之后 LLM prompt 和 sub-agent 只需指向 DSL，没有额外开销。<b>边际成本几乎为零。</b></p>
+    </div>
+  </details>
+
+  <details>
+    <summary>Q5 · 这套架构能扩展到 CTS / Routing 吗？</summary>
+    <div>
+      <p>能，而且<b>是同一个模式的复用</b>：</p>
+      <ul>
+        <li>CTS：LLM 产 <code>clock_constraints.yaml</code>（root buffer 位置约束、skew 目标、useful skew 提示），适配器翻译成 <code>create_clock_tree_spec</code> / <code>ccopt_design</code>。</li>
+        <li>Routing：LLM 产 <code>routing_constraints.yaml</code>（layer 偏好、屏蔽线、非默认规则），适配器翻译成 <code>setNanoRouteMode</code> + <code>route_design</code>。</li>
+      </ul>
+      <p>同样的原则：LLM 不算几何，只产约束；EDA 工具内置算法做求解。</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>Q6 · 那 RL 还有用武之地吗？</summary>
+    <div>
+      <p>有 —— 在<b>更深一层</b>：当某一类设计（如 DRAM bank 阵列）需要从大量历史 case 学一个泛化的 floorplan policy，
+      可以用 RL 在 DSL 层 <b>自动生成约束</b>，再走本架构剩余的 Layer 2 → 4。
+      也就是说：<b>RL 可以替代 LLM 的 Layer 1</b>，但仍然不直接产坐标，仍然要经过 DSL 和 Innovus。
+      LLM 和 RL 不是替代关系，而是 Layer 1 上的两种不同实现选项。</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>Q7 · 实际落地的最小可行版本是什么？</summary>
+    <div>
+      <p>三件事可以并行：</p>
+      <ol>
+        <li><b>DSL 模板</b>：<code>templates/macro_constraints_template.yaml</code>，先覆盖 groups / relative / edge_pins / halos / fixed_placement 五类</li>
+        <li><b>Innovus 适配器骨架</b>：<code>core/workflow/macro_placer/innovus_adapter.py</code>，把 DSL 翻成 TCL 字符串</li>
+        <li><b>floorplan-agent prompt</b>：在 <code>agents/floorplan-agent/AGENT.md</code> 加一段 "你的输出只能是 DSL YAML，不允许出现坐标数字"</li>
+      </ol>
+      <p>跑一个 X1 DRAM 小 case 走通整条流水线就算 MVP 完成。</p>
+    </div>
+  </details>
+
+</section>
+
+</main>
+
+<footer>
+  chip-backend-ai · LLM 驱动宏单元放置架构 ·
+  与 <code>docs/floorplan_agent_design.html</code>、<code>docs/backend_flow.html</code> 配套阅读 ·
+  生成于 2026-05-24
+</footer>
+
+<script>
+// === Tab navigation ===
+const tabs = document.querySelectorAll('nav.tabs button');
+const sections = document.querySelectorAll('main > section');
+tabs.forEach(btn => btn.addEventListener('click', () => {
+  tabs.forEach(b => b.classList.remove('active'));
+  sections.forEach(s => s.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(btn.dataset.tab).classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+}));
+
+// === Architecture layer details ===
+const layerData = {
+  1: {
+    title: "Layer 1 · LLM（意图层）",
+    color: "#a78bfa",
+    body: `
+      <div class="responsibility"><b>✓ 做什么：</b>
+        <ul>
+          <li>把人类自然语言 / 半结构化 spec 翻译成结构化的约束 DSL</li>
+          <li>在 review 阶段，把 Innovus 的反馈摘要（hints_for_llm）翻译成对 DSL 的<b>增量编辑</b></li>
+          <li>识别用户的隐式偏好（如"对称"、"和 PG 网络对齐"）并显式化为 DSL 字段</li>
+        </ul>
+      </div>
+      <div class="responsibility nope"><b>✗ 绝不做：</b>
+        <ul>
+          <li>不计算任何坐标数字（除非用户显式指定，那也是用户在算）</li>
+          <li>不输出 Innovus TCL 命令</li>
+          <li>不在脑子里维护宏的几何位置 —— 状态全部在 DSL 和 Innovus 数据库里</li>
+        </ul>
+      </div>
+      <p><b>实现：</b><code>agents/spec-agent</code> + <code>agents/floorplan-agent</code> 的 prompt + schema 约束（拒收非法字段）。</p>
+    `
+  },
+  2: {
+    title: "Layer 2 · 约束 DSL（协议层）",
+    color: "#22d3ee",
+    body: `
+      <div class="responsibility"><b>✓ 是什么：</b>
+        <ul>
+          <li>一份 YAML 文件：<code>spec/floorplan/macro_constraints.yaml</code></li>
+          <li>结构 = 一组声明性约束的合集（groups / relative / regions / edge_pins / halos / fixed_placement）</li>
+          <li><b>可被人类审查、可 diff、可 git 版本化、可单元测试</b></li>
+        </ul>
+      </div>
+      <div class="responsibility"><b>关键设计：</b>
+        <ul>
+          <li>所有字段都是声明性的（"应该如何"），不是过程性的（"先做什么再做什么"）</li>
+          <li>每条约束有唯一名字（便于 LLM 在反馈循环里精确改）</li>
+          <li>schema 用 <code>templates/macro_constraints_template.yaml</code> 锁住</li>
+        </ul>
+      </div>
+      <p><b>作用：</b>把 LLM 的"意思"固定下来，使 Layer 3 适配器可以纯函数式翻译，可重放可调试。</p>
+    `
+  },
+  3: {
+    title: "Layer 3 · Python 适配器 + Innovus TCL（绑定层）",
+    color: "#facc15",
+    body: `
+      <div class="responsibility"><b>✓ 做什么：</b>
+        <ul>
+          <li>读 DSL，输出 <code>setup.tcl</code></li>
+          <li>对"规则几何"做<b>死代码</b>计算（如 <code>x = origin + i*pitch</code> 的二重循环）</li>
+          <li>对"模糊约束"翻译成 Innovus 的 region / fence / halo API</li>
+          <li>最后写一句 <code>place_design -concurrent_macros</code> 把决策权交给 Innovus</li>
+        </ul>
+      </div>
+      <div class="responsibility nope"><b>✗ 不做：</b>
+        <ul>
+          <li>不做优化、不做搜索 —— 任何启发式都不写在这一层</li>
+          <li>不直接和 LLM 交互</li>
+        </ul>
+      </div>
+      <p><b>实现：</b><code>core/workflow/macro_placer/innovus_adapter.py</code>，纯函数：<code>render(dsl: dict) -> str</code>。</p>
+    `
+  },
+  4: {
+    title: "Layer 4 · Innovus place_design（几何/求解层）",
+    color: "#34d399",
+    body: `
+      <div class="responsibility"><b>✓ 做什么：</b>
+        <ul>
+          <li>在 region / fence 划定的可行域内，为<b>未固定的宏</b>选最优坐标</li>
+          <li>std cell legalization（避免重叠 / 行对齐）</li>
+          <li>wirelength / congestion / density 优化（这是 Innovus 内建的工业级算法）</li>
+          <li>失败时报错（重叠、出界、约束不可满足）—— 触发上层修正</li>
+        </ul>
+      </div>
+      <div class="responsibility"><b>反馈给上层：</b>
+        <ul>
+          <li><code>check_floorplan</code> 错误清单</li>
+          <li><code>report_congestion</code> + 热力图截图</li>
+          <li><code>report_timing -early</code> pre-CTS 时序</li>
+        </ul>
+      </div>
+      <p><b>关键性质：</b>这一层是<b>有几十年积累的成熟工业算法</b>，比任何 LLM / RL 都更可靠。
+        本架构的核心就是<b>把几何决策完整地留给它</b>。</p>
+    `
+  }
+};
+function selectLayer(n){
+  document.querySelectorAll('.arch-stack .layer').forEach(l => l.classList.remove('active'));
+  document.querySelector(`.arch-stack .layer[data-layer="${n}"]`).classList.add('active');
+  const d = layerData[n];
+  document.getElementById('arch-detail').innerHTML = `<h3 style="color:${d.color}">${d.title}</h3>${d.body}`;
+}
+selectLayer(1);
+
+// === Pipeline stepper ===
+const stepData = [
+  {
+    title: "Step 0 · 用户的原始需求",
+    who: '<span class="who llm">人类</span>',
+    body: `
+      <p>典型的需求描述（来自 spec doc 或聊天）：</p>
+      <pre><code>"做一个 X1 DRAM, 4 个 16MB bank 排成 2x2 阵列,
+控制器放在 bank 阵列北边, 距离 30um channel,
+IO 走南边边界, bank 之间留 20um 给 routing,
+所有 macro 周围加 10um halo."</code></pre>
+      <p class="muted">这是模糊的、半结构化的、带隐式领域知识的描述。没有任何工具可以直接消费。</p>
+    `
+  },
+  {
+    title: "Step 1 · LLM 产 DSL（核心一步）",
+    who: '<span class="who llm">floorplan-agent (LLM)</span>',
+    body: `
+      <p>LLM 读取需求 + die 尺寸 + macro list，输出 <code>spec/floorplan/macro_constraints.yaml</code>：</p>
+      <pre><code>die: {width_um: 800, height_um: 600}
+
+groups:
+  - name: dram_array
+    macros: [bank_0, bank_1, bank_2, bank_3]
+    topology: 2x2_array
+    pitch_um: [220, 180]
+    origin_um: [100, 100]
+
+relative:
+  - {a: ctrl, b: dram_array, relation: above, channel_um: 30}
+
+edge_pins:
+  - {pins: [io_data_*, io_cmd_*], side: south, spread: even}
+
+halos:
+  - {target: all_macros, halo_um: [10, 10, 10, 10]}
+
+spacing:
+  - {scope: dram_array_internal, min_um: 20}</code></pre>
+      <p><b>注意：</b>LLM 写出了 <code>origin_um: [100, 100]</code> —— 这是用户隐含给的"起始边距"，不是 LLM 计算的几何位置。
+        LLM 完全没碰过 bank_0 / bank_1 / bank_2 / bank_3 的实际坐标。</p>
+      <div class="note ok"><strong>关键观察：</strong>DSL 是<b>意图的结构化表达</b>，不是放置结果。
+        几何在哪里？还没在任何地方 —— 等下面两步算出来。</div>
+    `
+  },
+  {
+    title: "Step 2 · 适配器算规则坐标（Python 死代码）",
+    who: '<span class="who py">innovus_adapter.py</span>',
+    body: `
+      <p>对 <code>topology: 2x2_array</code> 这种规则结构，适配器用<b>普通循环</b>算出每个 bank 的坐标：</p>
+      <pre><code># core/workflow/macro_placer/innovus_adapter.py
+def render_array(group):
+    origin_x, origin_y = group['origin_um']
+    pitch_x, pitch_y = group['pitch_um']
+    rows, cols = parse_topology(group['topology'])  # "2x2_array" → (2, 2)
+    lines = []
+    for i in range(rows):
+        for j in range(cols):
+            idx = i * cols + j
+            inst = group['macros'][idx]
+            x = origin_x + j * pitch_x
+            y = origin_y + i * pitch_y
+            lines.append(f"placeInstance {inst} {x} {y} R0 -fixed")
+    return lines</code></pre>
+      <p>跑出来：</p>
+      <pre><code>placeInstance bank_0 100 100 R0 -fixed
+placeInstance bank_1 320 100 R0 -fixed
+placeInstance bank_2 100 280 R0 -fixed
+placeInstance bank_3 320 280 R0 -fixed</code></pre>
+      <p><b>这是优化吗？不是。</b>是 <code>x = origin + i * pitch</code> 的死代码。
+        任何会写循环的工程师都能写。LLM 没有参与，因为 LLM 不该参与。</p>
+    `
+  },
+  {
+    title: "Step 3 · 适配器写 TCL setup",
+    who: '<span class="who py">innovus_adapter.py</span><span class="who innovus">→ setup.tcl</span>',
+    body: `
+      <p>适配器把 DSL 其余约束翻译成 Innovus 的声明性 API：</p>
+      <pre><code># bank 阵列（已固定坐标）
+placeInstance bank_0 100 100 R0 -fixed
+placeInstance bank_1 320 100 R0 -fixed
+placeInstance bank_2 100 280 R0 -fixed
+placeInstance bank_3 320 280 R0 -fixed
+
+# ctrl 在 bank 阵列北边 30um channel 内 —— 用 region 划可行域
+# 阵列顶部 y = 280 + 180 = 460；ctrl region y in [490, 600]
+createRegion ctrl_region 100 490 540 600
+addToRegion ctrl_region ctrl
+
+# IO 在南边
+editPin -pin {io_data_* io_cmd_*} -side bottom -spread
+
+# halo
+createPlaceHalo -allMacros -halo 10 10 10 10
+
+# 触发 Innovus 自己的 placer
+place_design -concurrent_macros
+refine_macro_place
+
+# 验证 + 报告（这些命令的输出会被适配器收集回 eval_result.yaml）
+check_floorplan
+report_congestion -no_routing_blockage > reports/cong.rpt
+report_timing -early > reports/timing_pre_cts.rpt</code></pre>
+      <div class="note">
+        <strong>注意 ctrl 的坐标：</strong>适配器只给了 <em>region</em>（一个矩形可行域），
+        没有写 <code>placeInstance ctrl X Y</code>。
+        ctrl 的实际坐标会由 Innovus 在下一步根据 wirelength 自动选择。
+      </div>
+    `
+  },
+  {
+    title: "Step 4 · Innovus 求解",
+    who: '<span class="who innovus">Innovus place_design</span>',
+    body: `
+      <p>Innovus 接管，做<b>真正的几何优化</b>：</p>
+      <ol>
+        <li>把所有 fixed 宏（bank_0..3）当作障碍物</li>
+        <li>在 ctrl_region 矩形里，为 ctrl 选一个使 wirelength 最小的坐标（比如根据 ctrl 到 bank 的连接密度）</li>
+        <li>把 std cell 在 bank / ctrl 周围摆下，遵守 halo、避免 row 重叠</li>
+        <li>调用全局优化（HPWL + density + congestion）</li>
+        <li>输出 <code>floorplan.def</code> 和报告</li>
+      </ol>
+      <p><b>关键：</b>这一步用的是 Cadence 几十年积累的 placer 算法 —— 比 LLM、RL、SA、ILP 都更适合做这件事。
+        本架构的全部价值就是<b>把这块决策权完整留给 Innovus</b>。</p>
+      <pre><code># Innovus 报告（节选）：
+*INFO* place_design completed
+  HPWL: 12.3 mm  (initial: 18.7 mm, improved 34%)
+  Density: 0.62  (target ≤ 0.70)
+  Macro count: 4 placed (4 fixed by user)
+  Std cell count: 142,500 placed
+  Congestion: H_overflow_peak = 0.8, V_overflow_peak = 0.6  ← OK</code></pre>
+    `
+  },
+  {
+    title: "Step 5 · 反馈与迭代（如果有问题）",
+    who: '<span class="who innovus">eval_result.yaml</span><span class="who llm">→ LLM 修 DSL</span>',
+    body: `
+      <p>如果 Step 4 报了拥塞或时序违反，Innovus 把结果写进 <code>eval_result.yaml</code>，触发 LLM 修 DSL：</p>
+      <pre><code># 假设这次拥塞超标了
+metrics:
+  congestion:
+    h_overflow_peak: 1.6      # ← 红线 1.0
+    hotspot_region: {x: 320, y: 280, w: 100, h: 80}   # bank_3 附近
+hints_for_llm:
+  - "Hotspot at bank_3; channel between bank_2 and bank_3 is 20um (tight)"</code></pre>
+
+      <p>LLM 读到 hints_for_llm，做<b>一处 DSL 编辑</b>：</p>
+      <pre><code># 修改前
+spacing:
+  - {scope: dram_array_internal, min_um: 20}
+
+# 修改后（LLM 把 channel 加宽）
+spacing:
+  - {scope: dram_array_internal, min_um: 40}</code></pre>
+
+      <p>然后 Step 2~4 重跑。LLM 在整个循环里<b>做的都是"改一个数字"</b>这种局部、命名清晰的编辑，
+        而不是"看着热力图在脑子里重新搬宏"。</p>
+
+      <div class="note ok">
+        <strong>架构正确性的最终检验：</strong>整个 Step 0 → 5 走完，
+        <b>LLM 输出过的所有"数字"</b>，要么是用户给的（die 尺寸、pitch、channel）、
+        要么是常识级参数（halo 10um）—— <b>它从未"猜"过坐标</b>。
+      </div>
+    `
+  }
+];
+let currentStep = 0;
+function renderStep(){
+  const s = stepData[currentStep];
+  document.getElementById('step-content').innerHTML = `
+    <h3>${s.title}</h3>
+    <p><b>责任人：</b>${s.who}</p>
+    ${s.body}
+  `;
+  document.querySelectorAll('#stepper .pill').forEach(p => p.classList.remove('active'));
+  document.querySelector(`#stepper .pill[data-step="${currentStep}"]`).classList.add('active');
+  document.getElementById('prev-step').disabled = currentStep === 0;
+  document.getElementById('next-step').disabled = currentStep === stepData.length - 1;
+}
+function selectStep(n){ currentStep = n; renderStep(); }
+function prevStep(){ if(currentStep>0){currentStep--;renderStep();} }
+function nextStep(){ if(currentStep<stepData.length-1){currentStep++;renderStep();} }
+renderStep();
+</script>
+
+</body>
+</html>

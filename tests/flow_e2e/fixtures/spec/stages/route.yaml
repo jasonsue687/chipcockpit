@@ -1,0 +1,52 @@
+# SIMULATED fixture — route stage spec for the e2e validation.
+# Derived from templates/stage_spec_template.yaml; modeled on cts.yaml.
+#
+# Metric names are chosen to (a) exist in core/router.py METRIC_PATTERNS so the
+# parser extracts them (drc_violations → "total violations = <int>"; ALREADY in
+# METRIC_PATTERNS + mock_eda LINE_FORMATTERS, reused from the import stage), and
+# (b) be satisfiable by core/sim/mock_eda in-range picks (max:0 → mock picks 0),
+# so the route_eval gate PASSes in SIMULATION mode.
+
+stage: "route"
+spec_version: "v1"
+
+description: "Route quality gate (DRC clean / open / timing) for the design (simulation)."
+
+metrics:
+  - name: drc_violations            # post-route DRC + antenna violation count (lower = better; 0 = clean)
+    target:
+      min: null
+      max: 0
+    description: "Total DRC/antenna violations after detail route + DRC repair; must be clean (0)."
+
+# parameters feed both the decision scripts (route-strategy gen_decisions reads
+# the layer/NDR/shield + NanoRoute knobs; route-drc-repair gen_decisions reads the
+# repair knobs) and render-tcl (spec.parameters are merged under decisions.params,
+# so every {{placeholder}} in templates/tcl/route/*.tcl.tmpl resolves). Path-like
+# vars (report_dir/artifact_dir) come from the harness via --var, not here.
+parameters:
+  # --- global_route (route-strategy: layer assignment / NDR / shielding) ------
+  route_top_layer: "M7"             # routing layer window upper bound
+  route_bottom_layer: "M1"          # routing layer window lower bound
+  critical_net_layers: "M5 M6"      # preferred layers for clock/critical nets
+  ndr_name: "ROUTE_2W2S"            # clock/critical-net non-default routing rule
+  ndr_spacing_mult: 2               # NDR spacing multiplier
+  ndr_width_mult: 2                 # NDR width multiplier
+  shield_nets: "clk"                # nets to shield (clock / async / analog)
+  timing_driven: "true"             # setNanoRouteMode -routeWithTimingDriven
+  si_driven: "true"                 # setNanoRouteMode -routeWithSiDriven
+  # --- detail_route (route-strategy: NanoRoute options / post-route opt) -------
+  nanoroute_effort: 5               # NanoRoute detail-route iteration budget (→ droute_end_iteration)
+  route_with_eco: "false"           # setNanoRouteMode -routeWithEco
+  postroute_opt_level: "high"       # setOptMode -postRouteOptEffort (→ postroute_opt_effort)
+  # --- drc_repair (route-drc-repair: search & repair / redundant via) ---------
+  drc_report_limit: 1000            # verify_drc -limit
+  antenna_fix_mode: "true"          # setNanoRouteMode -drouteFixAntenna
+  antenna_diode_cell: "ANTENNA"     # antenna diode cell name
+  via_in_pin: "true"                # setNanoRouteMode -routeWithViaInPin
+  redundant_via: 2                  # addVias redundant (double) via effort (→ redundant_via_effort)
+
+upstream:
+  required_checkpoint: null
+  required_stages:
+    - cts

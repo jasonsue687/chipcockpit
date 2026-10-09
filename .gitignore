@@ -1,0 +1,50 @@
+# Secrets and local machine config
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials*
+**/settings.local.json
+.claude/settings.local.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# Node (if added later)
+node_modules/
+
+# Vendor manuals / derived copyrighted corpora (never commit)
+**/*.pdf
+**/raw_pdfs/
+**/processed_eda/
+knowledge/processed_eda/
+plugins/**/knowledge/processed_eda/
+
+# Generated flow workspaces
+tests/flow_e2e/runs/
+.chipflow/
+*.enc.dat/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
+
+# Large binaries
+*.odb
+*.gds
+*.oas
+*.lef
+*.def
+*.spef
+*.sdf

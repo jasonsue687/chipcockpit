@@ -1,0 +1,24 @@
+# ===========================================================================
+# add_blockage.tcl  —  golden template, rendered by render-tcl
+#   Add macro halo / placement blockage / voltage areas, then finalize the
+#   floorplan and emit a parseable floorplan_check report for the gate.
+#   double-brace placeholders filled from stage spec + decisions(params) + --var;
+#   '### @inject:<block>' injects AI-authored fragments from decisions.fragments
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- keep-out halo around every macro --------------------------------------
+addHaloToBlock {{halo_um}} {{halo_um}} {{halo_um}} {{halo_um}} -allMacro
+
+# --- placement blockage policy ---------------------------------------------
+createPlaceBlockage -type {{blockage_type}} -allMacro
+
+# --- AI-authored extra blockages / voltage areas ---------------------------
+### @inject:blockage_cmds
+
+# --- finalize floorplan -----------------------------------------------------
+defOut {{artifact_dir}}/floorplan.def
+
+# --- summarize floorplan quality into the gate report ----------------------
+checkFPlan -reportUtil > {{report_dir}}/floorplan_check.rpt
+reportFPlan -channel >> {{report_dir}}/floorplan_check.rpt

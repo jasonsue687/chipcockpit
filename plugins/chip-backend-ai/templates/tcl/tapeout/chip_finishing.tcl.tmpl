@@ -1,0 +1,26 @@
+# ===========================================================================
+# chip_finishing.tcl  —  golden template, rendered by render-tcl
+#   Mechanical step: final chip finishing on the signoff-clean filled design —
+#   standard-cell filler insertion, seal ring, and scribe line — then write the
+#   final DEF handed to streamout. No decision layer — params come straight from
+#   the stage spec + the artifact paths.
+#   double-brace placeholders filled from stage spec + parameters + --var.
+#   Produces final.def (consumed by streamout).
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- operate on the metal-filled, signoff-clean design ---------------------
+#   (filled.def from signoff is the design being finished here)
+
+# --- standard-cell filler insertion (no leftover gaps) ---------------------
+addFiller -cell { {{filler_cells}} } -prefix FILLER
+
+# --- seal ring around the die perimeter ------------------------------------
+addSealRing -width {{seal_ring_width_um}}
+
+# --- scribe line / dicing channel ------------------------------------------
+addScribeLine -width {{scribe_width_um}}
+
+# --- persist the finished, ready-to-streamout design -----------------------
+verifyGeometry -outfile {{report_dir}}/chip_finishing.rpt
+defOut {{artifact_dir}}/final.def

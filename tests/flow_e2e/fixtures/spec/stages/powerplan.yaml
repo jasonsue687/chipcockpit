@@ -1,0 +1,55 @@
+# SIMULATED fixture — powerplan stage spec for the e2e validation.
+# Derived from templates/stage_spec_template.yaml; modeled on floorplan.yaml.
+#
+# Metric names are chosen to (a) exist in core/router.py METRIC_PATTERNS so the
+# parser extracts them (power_grid_ir_drop → "worst IR drop (mV) = <v>"), and
+# (b) be satisfiable by core/sim/mock_eda in-range picks, so the power_eval gate
+# PASSes in SIMULATION mode.
+
+stage: "powerplan"
+spec_version: "v1"
+
+description: "Power-network quality gate (IR drop / connectivity) for the design (simulation)."
+
+metrics:
+  - name: power_grid_ir_drop      # worst static IR drop on the PG grid (mV)
+    target:
+      min: null
+      max: 50.0
+    description: "Worst-case static IR drop across the power grid; must stay under budget."
+
+# parameters feed both the decision script (gen_decisions.py reads the IR target +
+# these) and render-tcl (spec.parameters are merged under decisions.params, so
+# every {{placeholder}} in templates/tcl/powerplan/*.tcl.tmpl resolves). Path-like
+# vars (report_dir/artifact_dir) come from the harness via --var, not here.
+parameters:
+  # --- rail nets (shared by gen_power_plan / run_power_plan / early_ir) ------
+  power_net: "VDD"
+  ground_net: "VSS"
+  # --- gen_power_plan (PDN geometry; AI baseline, gen_decisions may refine) --
+  ring_layer: "M7"              # horizontal ring layer
+  ring_layer_v: "M8"            # vertical ring layer
+  ring_width_um: 2.0
+  ring_spacing_um: 0.5
+  ring_offset_um: 1.0
+  stripe_layer: "M8"
+  stripe_width_um: 1.0
+  stripe_spacing_um: 0.5
+  stripe_pitch_um: 20.0         # set_to_set_distance; smaller pitch → lower IR
+  sroute_target: "corePin"
+  # --- run_power_plan --------------------------------------------------------
+  follow_pin_layer: "M1"        # std-cell power-rail (follow-pin) layer
+  # --- insert_tap_decap ------------------------------------------------------
+  tap_cell: "TAPCELL"
+  tap_cell_distance_um: 30.0
+  endcap_cell: "ENDCAP"
+  decap_cell: "DCAP8"
+  decap_density_pct: 5.0
+  # --- early_ir --------------------------------------------------------------
+  analysis_view: "av_typ"
+  ir_mode: "domain"
+
+upstream:
+  required_checkpoint: null
+  required_stages:
+    - floorplan

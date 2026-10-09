@@ -1,0 +1,25 @@
+# ===========================================================================
+# signoff_sta.tcl  —  golden template, rendered by render-tcl
+#   Mechanical step: signoff static timing analysis across all corners/modes
+#   (with signal-integrity) on the extracted SPEF → pre-ECO timing report. No
+#   decision layer — params come straight from the stage spec + the SPEF/report
+#   paths. The fix_strategy decision step reads this report to plan the ECO.
+#   double-brace placeholders filled from stage spec + parameters + --var.
+#   Produces timing.rpt (PRE-ECO signoff timing; NOT the gate report).
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- annotate the extracted parasitics --------------------------------------
+spefIn {{artifact_dir}}/design.spef
+
+# --- signoff timing analysis config (signal integrity + on-chip variation) --
+setAnalysisMode -analysisType {{sta_analysis_type}}
+setAnalysisMode -checkType {{sta_check_type}}
+setSIMode -analysisType {{si_analysis}}
+
+# --- full signoff timing across every active corner/mode --------------------
+timeDesign -signoff -reportOnly -outDir {{report_dir}}
+
+# --- worst setup + worst hold report into the pre-ECO timing report ---------
+report_timing -late  -max_paths {{report_max_paths}} > {{report_dir}}/timing.rpt
+report_timing -early -max_paths {{report_max_paths}} >> {{report_dir}}/timing.rpt

@@ -1,0 +1,17 @@
+# ===========================================================================
+# global_net_connect.tcl  —  golden template, rendered by render-tcl
+#   PG logical connections + tie / physical-only cell setup.
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- power / ground global connections -------------------------------------
+globalNetConnect {{power_net}} -type pgpin -pin {{power_pin}} -inst * -verbose
+globalNetConnect {{ground_net}} -type pgpin -pin {{ground_pin}} -inst * -verbose
+
+# --- tie-high / tie-low -----------------------------------------------------
+globalNetConnect {{power_net}} -type tiehi -inst * -verbose
+globalNetConnect {{ground_net}} -type tielo -inst * -verbose
+
+### @inject:extra_connections
+
+applyGlobalNets

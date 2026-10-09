@@ -1,0 +1,12 @@
+# _meta.yaml Template — Sub-agent 运行元数据
+# 每次 run 产出一份，存放于 stages/<stage>/run_NNN/_meta.yaml
+# 编排器通过此文件索引和识别所有 run
+
+agent: ""                              # 产出此 run 的 agent 名称（如 floorplan_agent）
+stage: ""                              # 所属阶段
+run_id: ""                             # 本阶段第几次执行（如 run_001）
+timestamp: ""                          # ISO 8601 时间戳
+spec_version: ""                       # 基于哪个版本的 Spec 执行
+parent_run: null                       # 回滚后重跑时指向触发回滚的 run，否则 null
+status: "running"                      # running | completed | failed
+checkpoint: null                       # 关联的恢复点路径（如 checkpoints/post_floorplan_run001.def）

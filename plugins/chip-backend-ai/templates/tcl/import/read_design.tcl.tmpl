@@ -1,0 +1,24 @@
+# ===========================================================================
+# read_design.tcl  —  golden template, rendered by render-tcl
+#   double-brace placeholders are filled from stage spec + decisions + --var
+#   '### @inject:<block>' points inject AI-authored fragments from decisions
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- libraries (timing + physical) ----------------------------------------
+set init_lib_search_path { {{lib_search_path}} }
+set init_pwr_net {{power_net}}
+set init_gnd_net {{ground_net}}
+
+read_physical -lef { {{lef}} }
+read_libs { {{lib}} }
+
+# --- netlist ----------------------------------------------------------------
+read_netlist { {{netlist}} } -top {{top_module}}
+
+### @inject:extra_read_options
+
+# --- elaborate / init the design -------------------------------------------
+init_design -top {{top_module}}
+
+report_design -outfile {{report_dir}}/read_design.rpt

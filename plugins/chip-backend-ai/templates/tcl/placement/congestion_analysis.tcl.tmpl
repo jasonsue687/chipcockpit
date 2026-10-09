@@ -1,0 +1,17 @@
+# ===========================================================================
+# congestion_analysis.tcl  —  golden template, rendered by render-tcl
+#   Mechanical step (NON-gate auto-check): trial-route congestion estimate to
+#   produce congestion.rpt. No decision layer and NO inject point — params come
+#   straight from the stage spec. The downstream placement_eval gate parses this
+#   report (congestion_hotspot metric).
+#   double-brace placeholders filled from stage spec + parameters + --var.
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- trial / early global route to estimate congestion --------------------
+setNanoRouteMode -routeWithTimingDriven false
+earlyGlobalRoute
+routeDesign -globalDetail -trialRoute
+
+# --- summarize congestion (overflow) into the gate report ------------------
+report_congestion -overflow > {{report_dir}}/congestion.rpt

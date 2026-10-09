@@ -1,0 +1,22 @@
+# ===========================================================================
+# build_clock_tree.tcl  —  golden template, rendered by render-tcl
+#   Mechanical step: load the CTS spec produced by gen_cts_spec and synthesize
+#   the clock tree (CCOpt) — balance skew, route clock nets with the NDR.
+#   No decision layer — params come straight from the stage spec + the spec
+#   artifact path. Produces cts.def.
+#   double-brace placeholders filled from stage spec + parameters + --var.
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- load the CTS clock-tree spec from the decision step -------------------
+set_ccopt_property update_io_latency false
+read_ccopt_clock_tree_spec {{artifact_dir}}/cts.spec
+
+# --- clock-tree synthesis: build + balance skew + route clock nets ---------
+ccopt_design -cts
+
+# --- legalize after clock-buffer insertion ---------------------------------
+refinePlace
+
+# --- persist the design with the clock tree built --------------------------
+defOut {{artifact_dir}}/cts.def

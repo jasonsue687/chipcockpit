@@ -1,0 +1,35 @@
+# ===========================================================================
+# global_route.tcl  —  golden template, rendered by render-tcl
+#   AI-decision step (route-strategy / route.global_route): global routing +
+#   track assignment with layer assignment, clock/critical-net non-default
+#   routing rule (NDR) and shielding. Produces groute.def (global-route DEF)
+#   for the downstream detail_route step.
+#   double-brace placeholders filled from stage spec + decisions(params) + --var;
+#   '### @inject:<block>' injects AI-authored fragments from decisions.fragments
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- routing layer window (constrain global route to the routable stack) ----
+setNanoRouteMode -routeTopRoutingLayer {{route_top_layer}}
+setNanoRouteMode -routeBottomRoutingLayer {{route_bottom_layer}}
+
+# --- non-default routing rule for clock / critical nets ---------------------
+# (wider/spaced metal on the assigned layers lowers crosstalk and skew variation)
+create_route_rule -name {{ndr_name}} \
+    -spacing_multiplier {{ndr_spacing_mult}} \
+    -width_multiplier {{ndr_width_mult}}
+
+# --- shielding for the most sensitive nets (clock / async / analog) ---------
+setNanoRouteMode -routeWithTimingDriven {{timing_driven}}
+setNanoRouteMode -routeWithSiDriven {{si_driven}}
+
+# --- layer assignment + NDR/shield for critical & clock nets ----------------
+# (e.g. setNdrLayerRule / setAttribute -net <n> -non_default_rule <ndr>;
+#  addRouteShield / setNanoRouteMode -routeReserveSpaceForMultiCut ...)
+### @inject:critical_net_route_cmds
+
+# --- global routing + track assignment --------------------------------------
+globalRoute
+
+# --- persist the global-routed design ---------------------------------------
+defOut {{artifact_dir}}/groute.def

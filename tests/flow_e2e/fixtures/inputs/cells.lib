@@ -1,0 +1,11 @@
+/* SIMULATED fixture — synthetic Liberty for flow validation, NOT real timing. */
+# release: simrel_2026Q2
+library (sim_n5_typ) {
+  time_unit : "1ns";
+  voltage_unit : "1V";
+  cell (SIM_INV) {
+    area : 0.10;
+    pin (A) { direction : input; }
+    pin (Y) { direction : output; function : "A'"; }
+  }
+}

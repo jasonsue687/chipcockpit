@@ -1,0 +1,34 @@
+# ===========================================================================
+# apply_eco.tcl  —  golden template, rendered by render-tcl
+#   Mechanical step: apply the ECO change list produced by fix_strategy onto the
+#   DRC-clean routed design (ecoPlace legalizes inserted/resized cells, ecoRoute
+#   patches the affected nets), then re-run signoff timing to capture the
+#   POST-ECO result. No decision layer — params come straight from the stage
+#   spec + the artifact/report paths.
+#   double-brace placeholders filled from stage spec + parameters + --var.
+#   Produces eco.def AND eco_timing.rpt (the POST-ECO gate report).
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- replay the ECO change list from fix_strategy ---------------------------
+setEcoMode -honorDontUse true -honorFixedStatus true
+loadTimingEco -file {{artifact_dir}}/eco.changes
+
+# --- legalize the ECO-inserted / resized cells ------------------------------
+ecoPlace -fixGlobalRoute {{eco_fix_groute}}
+refinePlace
+
+# --- patch routing of the nets touched by the ECO ---------------------------
+setNanoRouteMode -routeWithEco true
+ecoRoute -target {{eco_route_mode}}
+
+# --- re-extract + re-time AFTER the ECO (final closure check) ---------------
+extractRC
+timeDesign -signoff -reportOnly -outDir {{report_dir}}
+
+# --- write the POST-ECO timing report (the timing_eval gate reads THIS) -----
+report_timing -late  -max_paths {{report_max_paths}} > {{report_dir}}/eco_timing.rpt
+report_timing -early -max_paths {{report_max_paths}} >> {{report_dir}}/eco_timing.rpt
+
+# --- persist the ECO-applied design -----------------------------------------
+defOut {{artifact_dir}}/eco.def

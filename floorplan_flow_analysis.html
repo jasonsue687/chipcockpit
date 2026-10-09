@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Floorplan 流程与 AI 辅助评分分析</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    color: #e2e8f0;
+    min-height: 100vh;
+    padding: 32px 16px;
+    line-height: 1.6;
+  }
+  .container { max-width: 1200px; margin: 0 auto; }
+
+  header {
+    text-align: center;
+    margin-bottom: 40px;
+    padding: 32px 24px;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 16px;
+    backdrop-filter: blur(8px);
+  }
+  header h1 {
+    font-size: 2rem;
+    background: linear-gradient(90deg, #60a5fa, #a78bfa, #f472b6);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    margin-bottom: 8px;
+  }
+  header p { color: #94a3b8; font-size: 0.95rem; }
+
+  /* Stats bar */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  .stat-card {
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    border-radius: 12px;
+    padding: 16px 20px;
+    text-align: center;
+  }
+  .stat-card .num { font-size: 1.8rem; font-weight: 700; color: #f1f5f9; }
+  .stat-card .label { font-size: 0.85rem; color: #94a3b8; margin-top: 4px; }
+
+  /* Filter bar */
+  .filter-bar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+    align-items: center;
+  }
+  .filter-bar span { color: #94a3b8; font-size: 0.9rem; margin-right: 8px; }
+  .filter-btn {
+    background: rgba(30, 41, 59, 0.7);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    color: #cbd5e1;
+    padding: 6px 14px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+  }
+  .filter-btn:hover { background: rgba(51, 65, 85, 0.9); }
+  .filter-btn.active {
+    background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+    border-color: transparent;
+    color: white;
+  }
+
+  /* Flow steps */
+  .flow {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .step {
+    background: rgba(30, 41, 59, 0.55);
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 14px;
+    overflow: hidden;
+    transition: all 0.25s;
+  }
+  .step:hover { border-color: rgba(96, 165, 250, 0.4); transform: translateY(-1px); }
+  .step.hidden { display: none; }
+
+  .step-header {
+    display: grid;
+    grid-template-columns: 60px 1fr auto 140px 32px;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 20px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .step-num {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700;
+    background: linear-gradient(135deg, #1e293b, #334155);
+    border: 2px solid rgba(96, 165, 250, 0.4);
+    color: #f1f5f9;
+  }
+  .step-title { font-size: 1.05rem; font-weight: 600; color: #f1f5f9; }
+  .step-title small { display: block; color: #94a3b8; font-size: 0.8rem; font-weight: 400; margin-top: 2px; }
+
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-left: 6px;
+  }
+  .tag-human { background: rgba(244, 114, 182, 0.15); color: #f9a8d4; border: 1px solid rgba(244, 114, 182, 0.3); }
+  .tag-auto  { background: rgba(34, 197, 94, 0.15); color: #86efac; border: 1px solid rgba(34, 197, 94, 0.3); }
+  .tag-mixed { background: rgba(251, 191, 36, 0.15); color: #fcd34d; border: 1px solid rgba(251, 191, 36, 0.3); }
+
+  /* Rating */
+  .rating {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-self: end;
+  }
+  .rating-bar {
+    width: 100px; height: 8px;
+    background: rgba(15, 23, 42, 0.8);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+  .rating-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s;
+  }
+  .rating-num { font-weight: 700; font-size: 0.95rem; min-width: 38px; text-align: right; }
+  .rating-high { color: #4ade80; }
+  .rating-high .rating-fill { background: linear-gradient(90deg, #22c55e, #4ade80); }
+  .rating-mid  { color: #fbbf24; }
+  .rating-mid  .rating-fill { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+  .rating-low  { color: #f87171; }
+  .rating-low  .rating-fill { background: linear-gradient(90deg, #ef4444, #f87171); }
+
+  .toggle-icon {
+    color: #94a3b8;
+    transition: transform 0.2s;
+    font-size: 1.2rem;
+  }
+  .step.open .toggle-icon { transform: rotate(180deg); }
+
+  .step-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.35s ease;
+    padding: 0 20px;
+  }
+  .step.open .step-body { max-height: 2000px; padding: 0 20px 20px; }
+
+  .body-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 8px;
+    padding-top: 18px;
+    border-top: 1px dashed rgba(148, 163, 184, 0.15);
+  }
+  @media (max-width: 768px) {
+    .body-grid { grid-template-columns: 1fr; }
+    .step-header { grid-template-columns: 50px 1fr 32px; }
+    .step-header .rating, .step-header .role-tags { grid-column: 1 / -1; justify-self: start; padding-left: 60px; }
+  }
+  .panel h4 {
+    color: #60a5fa;
+    font-size: 0.85rem;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .panel ul { list-style: none; padding-left: 0; }
+  .panel li {
+    padding: 4px 0 4px 18px;
+    position: relative;
+    font-size: 0.9rem;
+    color: #cbd5e1;
+  }
+  .panel li::before {
+    content: "▸";
+    position: absolute;
+    left: 0;
+    color: #60a5fa;
+  }
+  .panel.ai-panel {
+    background: rgba(96, 165, 250, 0.05);
+    border: 1px solid rgba(96, 165, 250, 0.15);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .panel.ai-panel li::before { content: "✦"; color: #a78bfa; }
+  .panel.warn-panel {
+    background: rgba(244, 114, 182, 0.05);
+    border: 1px solid rgba(244, 114, 182, 0.15);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .panel.warn-panel li::before { content: "!"; color: #f472b6; font-weight: 700; }
+
+  .rationale {
+    grid-column: 1 / -1;
+    padding: 12px 16px;
+    background: rgba(15, 23, 42, 0.5);
+    border-left: 3px solid #60a5fa;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    color: #cbd5e1;
+    margin-top: 12px;
+  }
+  .rationale strong { color: #93c5fd; }
+
+  /* Summary section */
+  .summary {
+    margin-top: 48px;
+    padding: 28px;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(139, 92, 246, 0.08));
+    border: 1px solid rgba(96, 165, 250, 0.2);
+    border-radius: 16px;
+  }
+  .summary h2 {
+    color: #f1f5f9;
+    margin-bottom: 16px;
+    font-size: 1.4rem;
+  }
+  .summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 16px;
+  }
+  @media (max-width: 768px) { .summary-grid { grid-template-columns: 1fr; } }
+  .summary-card {
+    background: rgba(15, 23, 42, 0.5);
+    padding: 16px;
+    border-radius: 10px;
+    border: 1px solid rgba(148, 163, 184, 0.15);
+  }
+  .summary-card h3 {
+    color: #60a5fa;
+    font-size: 1rem;
+    margin-bottom: 10px;
+  }
+  .summary-card p { color: #cbd5e1; font-size: 0.9rem; }
+
+  footer {
+    margin-top: 40px;
+    text-align: center;
+    color: #64748b;
+    font-size: 0.8rem;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>Floorplan 流程与 AI 辅助评分分析</h1>
+    <p>典型芯片后端 Floorplan 全流程 · AI/LLM 辅助效果评估 · 用于设计人在回环的 Floorplan Agent</p>
+  </header>
+
+  <div class="stats">
+    <div class="stat-card"><div class="num">12</div><div class="label">流程步骤</div></div>
+    <div class="stat-card"><div class="num" id="avgScore">—</div><div class="label">平均 AI 辅助评分</div></div>
+    <div class="stat-card"><div class="num rating-high" id="highCount">—</div><div class="label">高辅助效果 (≥7)</div></div>
+    <div class="stat-card"><div class="num rating-low" id="lowCount">—</div><div class="label">需重度人工 (≤4)</div></div>
+  </div>
+
+  <div class="filter-bar">
+    <span>筛选：</span>
+    <button class="filter-btn active" data-filter="all">全部</button>
+    <button class="filter-btn" data-filter="high">高辅助 (≥7)</button>
+    <button class="filter-btn" data-filter="mid">中等辅助 (5-6)</button>
+    <button class="filter-btn" data-filter="low">低辅助 (≤4)</button>
+    <button class="filter-btn" data-filter="human">人在回环重点</button>
+  </div>
+
+  <div class="flow" id="flow"></div>
+
+  <div class="summary">
+    <h2>📐 Floorplan Agent 设计建议</h2>
+    <p style="color:#cbd5e1; font-size:0.92rem;">基于上方各步骤的 AI 辅助评分，针对"人在回环、辅助驾驶"的定位给出 Agent 的能力分层建议。</p>
+    <div class="summary-grid">
+      <div class="summary-card">
+        <h3>🤖 AI 主导（人工 review 即可）</h3>
+        <p>设计导入、初始化、Pin/Bump 列表生成、Blockage/Halo 脚本化、报告解析、签出归档。这类步骤可由 Agent 自动生成 TCL 并执行，人工只看结果。</p>
+      </div>
+      <div class="summary-card">
+        <h3>🧑‍💻 人机协作（Agent 提建议，人决策）</h3>
+        <p>Floorplan 规格定义、Power Plan 模板生成、Pin Assignment、Floorplan QC 诊断。Agent 给出候选方案 + 推理依据，人工选择/微调。</p>
+      </div>
+      <div class="summary-card">
+        <h3>🎨 人工主导（Agent 提供环境与数据）</h3>
+        <p>Macro Placement、IO/Pad 物理规划、迭代收敛策略。需要架构 sense、dataflow 直觉。Agent 负责：dataflow 可视化、约束查询、违例热力图、修改后回归。</p>
+      </div>
+      <div class="summary-card">
+        <h3>🛠 Agent 必备能力栈</h3>
+        <p>① 调用 Innovus（TCL 生成+执行+回读日志）<br>② 解析 report/DEF/log（congestion、IR、timing）<br>③ Spec/约束的结构化存储（YAML）<br>④ 决策审计日志（人选了什么、为什么）<br>⑤ 回滚 checkpoint</p>
+      </div>
+    </div>
+  </div>
+
+  <footer>生成于本地 · 评分基于通用 PD 经验，非项目特定数据 · 单击任意步骤展开细节</footer>
+</div>
+
+<script>
+const steps = [
+  {
+    id: 1,
+    name: "Design Import / 设计导入",
+    sub: "读入 netlist、库文件、约束",
+    role: "auto",
+    score: 9,
+    activities: [
+      "读入综合后 netlist (.v/.vg)",
+      "加载 .lib timing library、LEF、Captable/QRC",
+      "加载 SDC 约束",
+      "MMMC（Multi-Mode Multi-Corner）setup"
+    ],
+    aiHelp: [
+      "根据工艺与项目类型生成标准 init_design 模板",
+      "自动校验文件路径与版本一致性",
+      "MMMC view 列表生成、缺失库检测"
+    ],
+    risks: [
+      "MMMC 配置错误会贯穿整个流程，需人工最终确认"
+    ],
+    rationale: "高度机械化、模式化，几乎没有创造性。AI 生成模板 + 路径合法性检查就能覆盖 90% 工作。"
+  },
+  {
+    id: 2,
+    name: "Design Initialization / 设计初始化",
+    sub: "init_design / 顶层模块设置",
+    role: "auto",
+    score: 9,
+    activities: [
+      "set_design_mode 设置工艺节点与流程",
+      "顶层模块识别、层次结构展平选项",
+      "CPF/UPF 电源意图加载",
+      "scan chain、test mode 配置"
+    ],
+    aiHelp: [
+      "依据综合报告自动生成 init 脚本",
+      "UPF 域定义合法性预检",
+      "工艺节点对应的默认参数推荐"
+    ],
+    risks: [
+      "UPF 与实际 PG 网络不一致会到很晚才暴露"
+    ],
+    rationale: "本质是配置项填写。AI 极擅长此类结构化输出，仅需人工把关电源意图的 sign-off。"
+  },
+  {
+    id: 3,
+    name: "Floorplan Spec 定义 / 规格制定",
+    sub: "Die/Core 尺寸、利用率、形状",
+    role: "mixed",
+    score: 6,
+    activities: [
+      "目标 die size、core size、aspect ratio",
+      "core utilization 目标 (典型 60-75%)",
+      "row 配置、site type",
+      "电源域划分、Always-On 区域规划"
+    ],
+    aiHelp: [
+      "基于 gate count + 类似项目历史给出 utilization 推荐区间",
+      "面积粗估（标准单元面积 + 宏面积 + 利用率系数）",
+      "提供多套候选规格（保守/激进/平衡）"
+    ],
+    risks: [
+      "面积锁定后修改成本极高，必须人工拍板",
+      "市场/封装/成本约束 AI 不一定知道"
+    ],
+    rationale: "AI 能做计算与候选生成，但最终拍板涉及成本、封装、上游约束等业务因素，必须人在回环。"
+  },
+  {
+    id: 4,
+    name: "IO / Pad / Bump 规划",
+    sub: "PAD ring、bump array、IO 顺序",
+    role: "human",
+    score: 5,
+    activities: [
+      "IO pad 类型选择（GPIO、power、analog）",
+      "PAD ring 构建或 flip-chip bump map",
+      "IO 顺序对应封装 ball-out",
+      "ESD/Power IO 间距规则"
+    ],
+    aiHelp: [
+      "根据 ball-map CSV 生成 bump 放置 TCL",
+      "对称性检查、间距 DRC 预检",
+      "RDL 可达性粗估"
+    ],
+    risks: [
+      "封装/系统约束驱动 IO 顺序，错位代价大",
+      "Analog/高速 IO 位置需要资深工程师判断"
+    ],
+    rationale: "脚本化部分（bump 放置、对称检查）AI 很强；但 IO 顺序与系统/封装绑定，仍由人主导。"
+  },
+  {
+    id: 5,
+    name: "Macro Placement / 宏单元布局",
+    sub: "SRAM/ROM/IP 摆放",
+    role: "human",
+    score: 4,
+    activities: [
+      "Dataflow 分析（哪些 macro 与哪些 logic 交互密集）",
+      "Memory 摆放（成组、朝向、channel 宽度）",
+      "通道宽度预留 (CTS/Route 资源)",
+      "热点/PD 网络受益布局"
+    ],
+    aiHelp: [
+      "生成 dataflow 图（cell↔macro 连接热度）",
+      "提供初始 auto place 候选 + 评分（线长/拥塞/时序）",
+      "对称约束的几何运算（镜像、翻转）"
+    ],
+    risks: [
+      "经验型直觉为主，AI 无 ground-truth",
+      "不同 macro 摆放策略导致 PPA 差异巨大"
+    ],
+    rationale: "整个 Floorplan 最'艺术'的步骤。AI 可以提供 dataflow 可视化和评估反馈，但摆放决策需要人的架构 sense。"
+  },
+  {
+    id: 6,
+    name: "Power Planning / 电源网络",
+    sub: "Ring/Stripe/Mesh",
+    role: "mixed",
+    score: 6,
+    activities: [
+      "Power ring 宽度、层选择",
+      "Stripe 间距、宽度、层方向",
+      "Macro power pin 连接",
+      "PG via array 规则"
+    ],
+    aiHelp: [
+      "依据电流密度估算自动出 stripe 参数",
+      "PG 模板参数化（addStripe / addRing TCL 生成）",
+      "Early IR 反馈循环：自动跑 → 回读 → 调整 stripe"
+    ],
+    risks: [
+      "过密 stripe 影响 routing 资源",
+      "过疏导致 IR drop / EM 违例"
+    ],
+    rationale: "规则驱动但需平衡。AI 适合做参数扫描和模板生成，关键决策（stripe 密度 vs 路由资源）人工拍板。"
+  },
+  {
+    id: 7,
+    name: "Blockage / Halo / Keepout 定义",
+    sub: "Hard/Soft blockage、placement halo",
+    role: "auto",
+    score: 8,
+    activities: [
+      "Macro 周围 placement halo（防 std cell 贴边）",
+      "Routing blockage（保留路由通道）",
+      "Hard blockage（机械约束区域）",
+      "Density screen"
+    ],
+    aiHelp: [
+      "根据 macro 类型自动生成 halo 规则",
+      "createPlaceBlockage / createRouteBlockage 脚本化",
+      "halo 冲突检测"
+    ],
+    risks: [
+      "halo 太大导致面积浪费"
+    ],
+    rationale: "规则可表达、可参数化。AI 写 TCL + 自动应用一类规则的效果非常好。"
+  },
+  {
+    id: 8,
+    name: "Pin Assignment / Pin 分配",
+    sub: "层次化设计 sub-block pin 位置",
+    role: "mixed",
+    score: 5,
+    activities: [
+      "Sub-block boundary pin 位置优化",
+      "Pin 间距、对齐",
+      "Bus pin 成组",
+      "时序驱动 pin placement"
+    ],
+    aiHelp: [
+      "自动 pin opt + 人工微调",
+      "Pin 报告解析、bus 识别",
+      "Pin 与顶层约束一致性检查"
+    ],
+    risks: [
+      "Pin 位置影响顶层 routing 与时序"
+    ],
+    rationale: "工具内置 assignPin 已经很强，AI 主要负责调用 + 结果检查 + 与顶层约束对账。"
+  },
+  {
+    id: 9,
+    name: "Power Network Analysis (Early)",
+    sub: "EarlyRail / IR / EM 预检",
+    role: "auto",
+    score: 7,
+    activities: [
+      "PG 连通性检查 (verify_power_via, verify_connectivity)",
+      "Early IR drop 估算",
+      "EM (Electromigration) 初步分析",
+      "Decap 容量评估"
+    ],
+    aiHelp: [
+      "自动跑 verify + 解析 report",
+      "热点定位（哪几个 stripe/instance 触发违例）",
+      "针对违例给出修复候选"
+    ],
+    risks: [
+      "Early 阶段精度有限，真实 vector 不可得"
+    ],
+    rationale: "工具输出结构化报告，AI 解析+定位+建议非常高效，人工只看结论与决策点。"
+  },
+  {
+    id: 10,
+    name: "Floorplan QC / 质量检查",
+    sub: "Trial Place、Trial Route、Congestion",
+    role: "auto",
+    score: 8,
+    activities: [
+      "place -prePlaceOpt 预布局",
+      "earlyGlobalRoute / trial route 拥塞热图",
+      "时序可行性 (preCTS WNS/TNS 估算)",
+      "利用率分布、density map"
+    ],
+    aiHelp: [
+      "Congestion map 区域识别 + 自动对应到附近 macro",
+      "WNS/TNS top paths 摘要 + 推断瓶颈",
+      "QC 报告综合打分（红/黄/绿）"
+    ],
+    risks: [
+      "Trial 阶段精度有限，决策要谨慎"
+    ],
+    rationale: "诊断与归纳是 LLM 强项。Agent 把多份 report 综合成一页人类可读结论，价值极高。"
+  },
+  {
+    id: 11,
+    name: "Floorplan 迭代 / Refinement",
+    sub: "调 macro、调 PG、调 utilization",
+    role: "human",
+    score: 5,
+    activities: [
+      "根据 QC 反馈选择调整方向",
+      "Macro 微移 / 翻转 / 重组",
+      "PG stripe 加密或减疏",
+      "Die size 调整（最后手段）"
+    ],
+    aiHelp: [
+      "提供'若调整 X 则预期 Y'的候选评估",
+      "管理 checkpoint / snapshot，便于回滚",
+      "记录决策日志（人选了哪个方案，为什么）"
+    ],
+    risks: [
+      "盲目迭代会陷入局部最优",
+      "多 macro 联调时人脑也容易丢失全局"
+    ],
+    rationale: "本质是优化决策，AI 给候选与回归，人选方向。Agent 在'实验管理'与'决策审计'上不可或缺。"
+  },
+  {
+    id: 12,
+    name: "Floorplan Sign-off / 交付",
+    sub: "保存 DEF / 数据库 / 报告",
+    role: "auto",
+    score: 9,
+    activities: [
+      "saveDesign / write_def / write_lef",
+      "Floorplan summary 报告",
+      "Checkpoint 元数据（git hash、工具版本、约束 hash）",
+      "向 Placement 阶段交接"
+    ],
+    aiHelp: [
+      "自动收集所有 sign-off 产物",
+      "生成结构化交接清单（YAML/JSON）",
+      "完整性自检（缺哪个文件就报警）"
+    ],
+    risks: [
+      "下游阶段对交付物的 schema 假设需被严格满足"
+    ],
+    rationale: "完全机械的交付动作，AI 标准化打包 + 校验完美匹配。"
+  }
+];
+
+// Render
+const flow = document.getElementById('flow');
+let html = '';
+let total = 0, highN = 0, lowN = 0;
+
+steps.forEach(s => {
+  total += s.score;
+  if (s.score >= 7) highN++;
+  if (s.score <= 4) lowN++;
+  const cls = s.score >= 7 ? 'rating-high' : s.score >= 5 ? 'rating-mid' : 'rating-low';
+  const roleTag = s.role === 'auto'
+    ? '<span class="tag tag-auto">AI 主导</span>'
+    : s.role === 'human'
+      ? '<span class="tag tag-human">人工主导</span>'
+      : '<span class="tag tag-mixed">人机协作</span>';
+
+  html += `
+    <div class="step" data-score="${s.score}" data-role="${s.role}">
+      <div class="step-header">
+        <div class="step-num">${s.id}</div>
+        <div class="step-title">${s.name}${roleTag}<small>${s.sub}</small></div>
+        <div class="role-tags"></div>
+        <div class="rating ${cls}">
+          <div class="rating-bar"><div class="rating-fill" style="width:${s.score * 10}%"></div></div>
+          <div class="rating-num">${s.score}/10</div>
+        </div>
+        <div class="toggle-icon">▾</div>
+      </div>
+      <div class="step-body">
+        <div class="body-grid">
+          <div class="panel">
+            <h4>🔧 主要活动</h4>
+            <ul>${s.activities.map(a => `<li>${a}</li>`).join('')}</ul>
+          </div>
+          <div class="panel ai-panel">
+            <h4>✨ AI 可以做什么</h4>
+            <ul>${s.aiHelp.map(a => `<li>${a}</li>`).join('')}</ul>
+          </div>
+          <div class="panel warn-panel" style="grid-column:1/-1;">
+            <h4>⚠️ 风险 / 人工必须把关的点</h4>
+            <ul>${s.risks.map(a => `<li>${a}</li>`).join('')}</ul>
+          </div>
+          <div class="rationale"><strong>评分理由：</strong>${s.rationale}</div>
+        </div>
+      </div>
+    </div>
+  `;
+});
+
+flow.innerHTML = html;
+document.getElementById('avgScore').textContent = (total / steps.length).toFixed(1);
+document.getElementById('highCount').textContent = highN;
+document.getElementById('lowCount').textContent = lowN;
+
+// Expand toggle
+document.querySelectorAll('.step-header').forEach(h => {
+  h.addEventListener('click', () => h.parentElement.classList.toggle('open'));
+});
+
+// Filters
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const f = btn.dataset.filter;
+    document.querySelectorAll('.step').forEach(s => {
+      const score = parseInt(s.dataset.score, 10);
+      const role = s.dataset.role;
+      let show = true;
+      if (f === 'high') show = score >= 7;
+      else if (f === 'mid') show = score >= 5 && score <= 6;
+      else if (f === 'low') show = score <= 4;
+      else if (f === 'human') show = role === 'human';
+      s.classList.toggle('hidden', !show);
+    });
+  });
+});
+</script>
+</body>
+</html>

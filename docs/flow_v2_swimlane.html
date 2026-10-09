@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>改造后现状 · 详细泳道图（48 步 · 每步 skill）</title>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#1e293b; --panel2:#273449; --line:#334155;
+    --text:#e2e8f0; --muted:#94a3b8; --accent:#38bdf8; --accent2:#22d3ee;
+    --design:#a78bfa; --mech:#38bdf8; --measure:#22c55e; --human:#f59e0b; --check:#2dd4bf;
+    --new:#f43f5e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"Segoe UI",Helvetica,"PingFang SC","Microsoft YaHei",sans-serif;
+       background:var(--bg);color:var(--text);line-height:1.5}
+  header{padding:22px 34px;background:linear-gradient(135deg,#0b1224 0%,#172554 100%);border-bottom:1px solid var(--line)}
+  header h1{margin:0;font-size:21px}
+  header p{margin:8px 0 0;color:var(--muted);font-size:13px;max-width:1180px}
+  header b{color:var(--accent)}
+  .ver{display:inline-block;font-size:11px;background:#14532d;color:#bbf7d0;border-radius:6px;padding:2px 9px;margin-left:8px;font-weight:700}
+  .bar{display:flex;flex-wrap:wrap;gap:12px;padding:14px 34px;background:#0b1224;border-bottom:1px solid var(--line)}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:8px 14px;font-size:12.5px}
+  .stat b{font-size:18px;color:var(--accent);margin-right:5px}
+  .stat.h b{color:var(--human)} .stat.g b{color:var(--measure)} .stat.d b{color:var(--design)}
+  .legend{display:flex;gap:15px;flex-wrap:wrap;padding:11px 34px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);align-items:center}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .sw{width:11px;height:11px;border-radius:3px;display:inline-block}
+  .sw.design{background:var(--design)} .sw.mech{background:var(--mech)} .sw.measure{background:var(--measure)}
+  .sw.human{background:var(--human)} .sw.check{background:var(--check)}
+  .hint{padding:9px 34px;font-size:12px;color:#94a3b8;border-bottom:1px solid var(--line)}
+  .hint code{color:#fbbf24;font-family:"SF Mono",Consolas,monospace}
+
+  .scroll{overflow-x:auto;padding:18px 34px 34px}
+  .board{display:flex;gap:0;min-width:min-content;align-items:flex-start}
+  .lane{flex:0 0 232px;width:232px;padding:0 10px;border-right:1px dashed var(--line)}
+  .lane:last-child{border-right:none}
+  .lhead{background:#0b1224;border:1px solid var(--accent);border-radius:10px;padding:9px 10px;margin-bottom:16px;position:relative}
+  .lhead .num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;
+              background:#0f1f3a;border:1.5px solid var(--accent);color:var(--accent);font-size:12px;font-weight:700}
+  .lhead .nm{font-size:13px;color:var(--accent);font-weight:700;margin-top:5px}
+  .lhead .mt{font-size:10.5px;color:var(--muted);margin-top:2px}
+  .lhead::after{content:"→";position:absolute;right:-13px;top:18px;color:#475569;font-size:15px;z-index:2}
+  .lane:last-child .lhead::after{content:""}
+
+  .card{background:#0b1224;border:1px solid var(--line);border-left:3px solid var(--mech);border-radius:8px;
+        padding:8px 9px;margin-bottom:20px;position:relative}
+  .card.t-design{border-left-color:var(--design)} .card.t-mech{border-left-color:var(--mech)}
+  .card.t-measure{border-left-color:var(--measure)} .card.t-human{border-left-color:var(--human)} .card.t-check{border-left-color:var(--check)}
+  .card:not(:last-child)::after{content:"▼";position:absolute;bottom:-15px;left:50%;transform:translateX(-50%);color:#475569;font-size:10px}
+  .card.t-human{background:#171008;border-style:dashed;border-color:#5b3c12}
+  .sid{font-family:"SF Mono",Consolas,monospace;font-size:11.5px;color:#f1f5f9;font-weight:700;overflow-wrap:anywhere}
+  .row{display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-top:4px}
+  .tg{font-size:9px;padding:1px 6px;border-radius:7px;font-weight:700;letter-spacing:.3px}
+  .tg.design{background:#4c1d95;color:#ddd6fe} .tg.mech{background:#0c4a6e;color:#bae6fd}
+  .tg.measure{background:#14532d;color:#bbf7d0} .tg.human{background:#78350f;color:#fde68a} .tg.check{background:#134e4a;color:#99f6e4}
+  .new{font-size:8.5px;font-weight:800;padding:1px 5px;border-radius:6px;background:var(--new);color:#fff;letter-spacing:.4px}
+
+  .chain{margin-top:7px;border-top:1px dashed #243047;padding-top:6px}
+  .clab{font-size:9.5px;color:#64748b;margin-bottom:4px;letter-spacing:.3px}
+  .sk{display:flex;align-items:center;gap:6px;margin:3px 0;font-family:"SF Mono",Consolas,monospace;font-size:10.5px}
+  .sk .stepn{flex:0 0 13px;color:#475569;font-size:9px}
+  .pill{padding:1.5px 7px;border-radius:6px;font-weight:600;overflow-wrap:anywhere}
+  .pill.dec{background:#3b1d6e;color:#ddd6fe;border:1px solid #6d4ec0}
+  .pill.tcl{background:#0b3a56;color:#bae6fd}
+  .pill.run{background:#0b3a56;color:#bae6fd}
+  .pill.parse{background:#0f3d22;color:#bbf7d0}
+  .pill.vc{background:#0c3a36;color:#99f6e4}
+  .pill.none{background:#3a2a0c;color:#fde68a;border:1px dashed #7a5a1a}
+  .arrow{color:#475569;font-size:11px}
+  .out{font-size:9.5px;color:#6b7e96;font-family:"SF Mono",Consolas,monospace;margin-top:6px;overflow-wrap:anywhere}
+  .out i{color:#86efac;font-style:normal}
+  .foot{padding:16px 34px 40px;color:#94a3b8;font-size:12px;max-width:1100px}
+  .foot code{color:#fbbf24;font-family:"SF Mono",monospace}
+  .foot b{color:var(--accent2)}
+</style>
+</head>
+<body>
+<header>
+  <h1>改造后现状 · 详细泳道图<span class="ver">v0.4.0 现状</span></h1>
+  <p>9 个 stage 泳道（横向滚动），每一步展示<b>实际加载并执行的 skill 链</b>。executor 四类：AI 决策步先跑决策 skill 产 <code style="color:#c4b5fd">decisions.yaml</code>，再 <b>render-tcl → run-eda-script</b>；自动执行步只 render+run；gate 跑 <b>parse-eda-report</b>；人工门无 skill，流程停在 <code style="color:#fcd34d">await_human</code> 等 <b>resolve-human</b>。</p>
+</header>
+
+<div class="bar">
+  <div class="stat"><b>9</b>stage</div>
+  <div class="stat"><b>48</b>step</div>
+  <div class="stat d"><b>11</b>AI 决策步</div>
+  <div class="stat"><b>19</b>自动执行步</div>
+  <div class="stat g"><b>8</b>gate</div>
+  <div class="stat h"><b>9</b>人工门</div>
+  <div class="stat"><b>1</b>版本校验</div>
+</div>
+<div class="legend">
+  <span><i class="sw check"></i> version-check</span>
+  <span><i class="sw design"></i> AI 决策 (决策skill + render-tcl + run-eda-script)</span>
+  <span><i class="sw mech"></i> 自动执行 (render-tcl + run-eda-script)</span>
+  <span><i class="sw measure"></i> Gate (parse-eda-report)</span>
+  <span><i class="sw human"></i> 人工门 (resolve-human · 无 skill)</span>
+</div>
+<div class="hint">读法：每个步骤卡片下半部「执行 skill」按<b style="color:#cbd5e1">实际调用顺序</b>从上到下列出。紫=决策 playbook skill，蓝=render-tcl/run-eda-script，绿=parse-eda-report，青=version-check，黄=人工(无 skill)。<span style="color:#f43f5e;font-weight:700">NEW</span>=本次新增的人工门。</div>
+
+<div class="scroll"><div class="board" id="board"></div></div>
+
+<div class="foot">
+  <b>共享 skill 复用</b>：所有自动执行/决策步的末段都复用同两个共享 skill —— <code>render-tcl</code>（template + decisions.yaml → 具体 step.tcl）和 <code>run-eda-script</code>（<code>--mock</code> 跑出可解析的 SIMULATED 报告）。8 个 gate 全部复用 <code>parse-eda-report</code>。决策 skill 是<b>双轨</b>的：主 agent 读 SKILL.md playbook 对本芯片 spec/上游 eval 推理，<code>scripts/gen_decisions.py</code> 是无人值守兜底。9 个人工门不加载任何 skill —— 它们故意不声明 output，所以永远停在 <code>await_human</code>，只能由 <code>resolve-human</code> 清除（这正是"可换会话续跑"的持久暂停点）。
+</div>
+
+<script>
+const DEC_DESC={'floorplan-plan':'die/core·aspect ratio','floorplan-io-pins':'IO pin / pad ring','floorplan-macro':'macro 摆放 / blockage',
+  'powerplan-design':'电源环/条带/sroute','placement-design':'布局+优化(tie/HFNS)','cts-design':'skew/NDR/leaf/skew group',
+  'route-strategy':'层分配/NDR/shielding','route-drc-repair':'DRC/antenna 修复','timing-eco-design':'setup/hold/功耗 ECO 策略'};
+const STAGES=[
+ {id:'import',nm:'Design Import',steps:[
+   {id:'version_check',t:'check',out:'version_check.rpt'},
+   {id:'read_design',t:'mech',out:'imported.db'},
+   {id:'setup_mmmc',t:'mech',out:'mmmc.db'},
+   {id:'global_net_connect',t:'mech',out:'import_done.db'},
+   {id:'check_design',t:'mech',out:'check_design.rpt'},
+   {id:'import_eval',t:'measure',out:'eval_result.yaml'},
+ ]},
+ {id:'floorplan',nm:'Floorplan',steps:[
+   {id:'gen_floorplan',t:'design',sk:'floorplan-plan',out:'fp_init.def'},
+   {id:'place_io_pins',t:'design',sk:'floorplan-io-pins',out:'fp_pins.def'},
+   {id:'macro_placement',t:'design',sk:'floorplan-macro',out:'fp_macro.def'},
+   {id:'confirm_macro',t:'human'},
+   {id:'add_blockage',t:'design',sk:'floorplan-macro',out:'floorplan.def + fp_check.rpt'},
+   {id:'floorplan_eval',t:'measure',out:'eval_result.yaml'},
+   {id:'confirm_floorplan_result',t:'human',new:1},
+ ]},
+ {id:'powerplan',nm:'Power Planning',steps:[
+   {id:'gen_power_plan',t:'design',sk:'powerplan-design',out:'power_plan.tcl'},
+   {id:'run_power_plan',t:'mech',out:'pg.def'},
+   {id:'insert_tap_decap',t:'mech',out:'pg_full.def'},
+   {id:'early_ir',t:'mech',out:'ir.rpt'},
+   {id:'power_eval',t:'measure',out:'eval_result.yaml'},
+   {id:'confirm_powerplan_result',t:'human',new:1},
+ ]},
+ {id:'placement',nm:'Placement',steps:[
+   {id:'place_opt',t:'design',sk:'placement-design',out:'placed.def'},
+   {id:'scan_reorder',t:'mech',out:'placed_scan.def'},
+   {id:'congestion_analysis',t:'mech',out:'congestion.rpt'},
+   {id:'placement_eval',t:'measure',out:'eval_result.yaml'},
+   {id:'confirm_placement_result',t:'human',new:1},
+ ]},
+ {id:'cts',nm:'CTS',steps:[
+   {id:'gen_cts_spec',t:'design',sk:'cts-design',out:'cts.spec'},
+   {id:'build_clock_tree',t:'mech',out:'cts.def'},
+   {id:'postcts_opt',t:'mech',out:'cts_opt.def + clock_tree.rpt'},
+   {id:'cts_eval',t:'measure',out:'eval_result.yaml'},
+   {id:'confirm_cts_result',t:'human',new:1},
+ ]},
+ {id:'route',nm:'Routing',steps:[
+   {id:'global_route',t:'design',sk:'route-strategy',out:'groute.def'},
+   {id:'detail_route',t:'design',sk:'route-strategy',out:'routed.def'},
+   {id:'drc_repair',t:'design',sk:'route-drc-repair',out:'routed_clean.def + drc.rpt'},
+   {id:'route_eval',t:'measure',out:'eval_result.yaml'},
+   {id:'confirm_route_result',t:'human',new:1},
+ ]},
+ {id:'timing_eco',nm:'Timing ECO',steps:[
+   {id:'extract_rc',t:'mech',out:'design.spef'},
+   {id:'signoff_sta',t:'mech',out:'timing.rpt'},
+   {id:'fix_strategy',t:'design',sk:'timing-eco-design',out:'eco.changes'},
+   {id:'apply_eco',t:'mech',out:'eco.def + eco_timing.rpt'},
+   {id:'timing_eval',t:'measure',out:'eval_result.yaml'},
+   {id:'confirm_timing_result',t:'human',new:1},
+ ]},
+ {id:'signoff',nm:'Signoff',steps:[
+   {id:'metal_fill',t:'mech',out:'filled.def'},
+   {id:'signoff_drc_lvs',t:'mech',out:'drc_lvs.rpt'},
+   {id:'signoff_ir_em',t:'mech',out:'ir_em.rpt'},
+   {id:'waiver_review',t:'human'},
+   {id:'signoff_eval',t:'measure',out:'eval_result.yaml'},
+ ]},
+ {id:'tapeout',nm:'Tapeout',steps:[
+   {id:'chip_finishing',t:'mech',out:'final.def'},
+   {id:'streamout',t:'mech',out:'chip.gds'},
+   {id:'final_checklist',t:'human'},
+ ]},
+];
+const TT={design:'AI 决策',mech:'自动执行',measure:'GATE',human:'人工门',check:'版本校验'};
+
+function chainHtml(s){
+  let items=[];
+  if(s.t==='check') items=[['vc','version-check','确定性版本一致校验']];
+  else if(s.t==='mech') items=[['tcl','render-tcl','template→step.tcl'],['run','run-eda-script','--mock 跑脚本']];
+  else if(s.t==='design') items=[['dec',s.sk,'gen_decisions→decisions.yaml'],['tcl','render-tcl','+decisions→step.tcl'],['run','run-eda-script','--mock 跑脚本']];
+  else if(s.t==='measure') items=[['parse','parse-eda-report','报告→eval_result']];
+  else if(s.t==='human') items=[['none','（无 skill）','resolve-human 清除']];
+  const rows=items.map((it,i)=>{
+    const n=s.t==='human'?'·':(i+1);
+    return `<div class="sk"><span class="stepn">${n}</span>${i>0?'<span class="arrow">↓</span>':''}<span class="pill ${it[0]}" title="${it[2]}">${it[1]}</span></div>`;
+  }).join('');
+  const lab=s.t==='human'?'流程暂停':'执行 skill（按调用序）';
+  return `<div class="chain"><div class="clab">${lab}</div>${rows}</div>`;
+}
+
+const board=document.getElementById('board');
+let gi=0;
+STAGES.forEach((st,si)=>{
+  const cards=st.steps.map(s=>{
+    gi++;
+    const badges=[`<span class="tg ${s.t}">${TT[s.t]}</span>`];
+    if(s.new)badges.push('<span class="new">NEW</span>');
+    const decd=s.t==='design'?`<div style="font-size:10px;color:#a78bfa;margin-top:2px">${DEC_DESC[s.sk]||''}</div>`:'';
+    const out=s.out?`<div class="out">out → <i>${s.out}</i></div>`:'';
+    return `<div class="card t-${s.t}">
+      <div class="sid">${gi}. ${s.id}</div>
+      <div class="row">${badges.join('')}</div>
+      ${decd}${chainHtml(s)}${out}</div>`;
+  }).join('');
+  const dec=st.steps.filter(s=>s.t==='design').length;
+  const hum=st.steps.filter(s=>s.t==='human').length;
+  const gate=st.steps.filter(s=>s.t==='measure').length;
+  const mt=[`${st.steps.length} 步`];
+  if(dec)mt.push(`${dec} 决策`); if(gate)mt.push(`${gate} gate`); if(hum)mt.push(`${hum} 人工`);
+  const lane=document.createElement('div');
+  lane.className='lane';
+  lane.innerHTML=`<div class="lhead"><span class="num">${si}</span><div class="nm">${st.nm}</div><div class="mt">${mt.join(' · ')}</div></div>${cards}`;
+  board.appendChild(lane);
+});
+</script>
+</body>
+</html>

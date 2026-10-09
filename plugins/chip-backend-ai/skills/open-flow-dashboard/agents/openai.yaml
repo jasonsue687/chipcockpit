@@ -1,0 +1,4 @@
+interface:
+  display_name: "打开流程驾驶舱"
+  short_description: "自动发现当前芯片项目工作区并打开只读流程状态驾驶舱页面"
+  default_prompt: "Use $open-flow-dashboard to open the current project flow dashboard."

@@ -1,0 +1,40 @@
+# Global Spec Template — 芯片后端设计全局约束规范
+# spec-draft（主 agent 执行的 playbook）基于此模板生成 spec/global_spec.yaml，人类审批后生效。
+
+project_name: ""                      # 项目/Block 名称
+spec_version: "v1"                    # 版本号，每次修订递增
+
+# 人类原始意图（原文保留，便于回溯）
+human_goal: ""
+
+# 全局 PPA 目标
+target_ppa:
+  timing:
+    wns_ns: -0.1                       # Worst Negative Slack 阈值（ns），负值表示允许的最大违例
+    tns_ns: -1.0                       # Total Negative Slack 阈值（ns）
+    hold_wns_ns: 0.0                   # Hold WNS 阈值
+  power:
+    total_power_mw: null               # 总功耗上限（mW），null 表示不约束
+    leakage_power_mw: null
+  area:
+    utilization_min: 0.60              # 最低利用率
+    utilization_max: 0.80              # 最高利用率
+
+# 全局约束
+global_constraints:
+  max_stage_retries: 3                 # 单阶段最大重试次数
+  global_retry_budget: 15              # 全局总重试预算
+  technology: ""                       # 工艺节点（如 "tsmc_n5"）
+  design_intent: ""                    # 设计意图描述
+
+# 阶段列表（有序，定义执行流水线）
+stages:
+  - floorplan
+  - cts
+  - route
+
+# 终止条件
+termination_criteria:
+  all_stages_passed: true              # 所有阶段 eval pass
+  timing_signoff: true                 # 时序满足 target_ppa.timing
+  drc_clean: false                     # DRC 清零（可选）

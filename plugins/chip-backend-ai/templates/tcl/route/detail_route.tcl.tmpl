@@ -1,0 +1,30 @@
+# ===========================================================================
+# detail_route.tcl  —  golden template, rendered by render-tcl
+#   AI-decision step (route-strategy / route.detail_route): detailed routing
+#   (NanoRoute) + post-route optimization. Reads the global-routed DEF and
+#   produces routed.def. NanoRoute effort + post-route opt level are decided
+#   per-chip by route-strategy.
+#   double-brace placeholders filled from stage spec + decisions(params) + --var;
+#   '### @inject:<block>' injects AI-authored fragments from decisions.fragments
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- NanoRoute effort / quality knobs ---------------------------------------
+setNanoRouteMode -routeWithTimingDriven {{timing_driven}}
+setNanoRouteMode -routeWithSiDriven {{si_driven}}
+setNanoRouteMode -drouteEndIteration {{droute_end_iteration}}
+setNanoRouteMode -routeWithEco {{route_with_eco}}
+
+# --- AI-authored extra NanoRoute options (verified via search-eda-command) --
+# (e.g. setNanoRouteMode -routeWithLithoDriven true / -drouteFixAntenna true)
+### @inject:nanoroute_opts
+
+# --- detailed routing (global + track-assign + detail in one pass) ----------
+routeDesign -globalDetail
+
+# --- post-route timing/DRV optimization (effort level decided per chip) -----
+setOptMode -postRouteOptEffort {{postroute_opt_effort}}
+optDesign -postRoute
+
+# --- persist the detail-routed design ---------------------------------------
+defOut {{artifact_dir}}/routed.def

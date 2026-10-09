@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>后端流程 YAML 化 · 方案比选</title>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#1e293b; --panel2:#273449; --line:#334155;
+    --text:#e2e8f0; --muted:#94a3b8; --accent:#38bdf8; --accent2:#22d3ee;
+    --ok:#22c55e; --warn:#f59e0b; --err:#ef4444; --info:#a78bfa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"Segoe UI",Helvetica,"PingFang SC","Microsoft YaHei",sans-serif;
+       background:var(--bg);color:var(--text);line-height:1.55}
+  header{padding:30px 40px;background:linear-gradient(135deg,#0b1224 0%,#172554 100%);
+         border-bottom:1px solid var(--line)}
+  header h1{margin:0;font-size:24px}
+  header p{margin:8px 0 0;color:var(--muted);font-size:14px;max-width:900px}
+  main{padding:30px 40px;max-width:1280px;margin:0 auto}
+  h2{font-size:20px;border-left:4px solid var(--accent);padding-left:12px;margin:30px 0 14px}
+  h3{font-size:16px;color:var(--accent2);margin-top:24px}
+  p{color:#cbd5e1}
+  code{font-family:"SF Mono",Consolas,monospace;color:#fbbf24;font-size:13px}
+
+  /* split-of-concerns banner */
+  .split-banner{background:#0b1224;border:1px solid var(--accent);border-radius:10px;
+                padding:18px 22px;margin-bottom:18px;display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .split-banner h4{margin:0 0 6px;font-size:14px;color:var(--accent)}
+  .split-banner p{margin:0;font-size:13px;color:#cbd5e1}
+  .split-banner .col{border-left:3px solid var(--accent);padding-left:14px}
+  .split-banner .col:last-child{border-left-color:var(--info)}
+  .split-banner .col:last-child h4{color:var(--info)}
+
+  /* I/O contract banner */
+  .io-banner{background:#0b1224;border:1px solid var(--accent2);border-radius:10px;
+             padding:18px 22px;margin-bottom:24px}
+  .io-banner h4{margin:0 0 8px;font-size:14px;color:var(--accent2)}
+  .io-banner p{margin:6px 0;font-size:13px;color:#cbd5e1}
+  .io-banner .keys{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:12.5px}
+  .io-banner .keys b{color:#fbbf24;font-family:"SF Mono",Consolas,monospace}
+  .io-banner .keys span{background:#1e293b;padding:6px 12px;border-radius:6px;border:1px solid var(--line)}
+
+  /* matrix */
+  table.matrix{width:100%;border-collapse:collapse;margin:8px 0 0;font-size:13.5px;
+               background:var(--panel);border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+  table.matrix th,table.matrix td{padding:11px 14px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+  table.matrix th{background:#0b1224;color:var(--accent2);font-weight:600;font-size:13px}
+  table.matrix tr:last-child td{border-bottom:none}
+  table.matrix td:first-child{color:var(--muted);font-weight:500}
+  .pill{display:inline-block;padding:3px 9px;border-radius:10px;font-size:12px;font-weight:500}
+  .pill.low{background:#14532d;color:#bbf7d0}
+  .pill.mid{background:#7c2d12;color:#fed7aa}
+  .pill.high{background:#7f1d1d;color:#fecaca}
+  .pill.yes{background:#7c2d12;color:#fed7aa}
+  .pill.no{background:#1e3a8a;color:#bfdbfe}
+
+  /* proposal cards */
+  .proposals{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:18px}
+  @media (max-width:1240px){.proposals{grid-template-columns:1fr}}
+  .proposal{background:var(--panel);border:2px solid var(--line);border-radius:12px;
+            padding:20px 22px;transition:.25s;position:relative}
+  .proposal.A{border-top:4px solid #22c55e}
+  .proposal.B{border-top:4px solid #38bdf8}
+  .proposal.C{border-top:4px solid #f59e0b}
+  .proposal h3{margin:0 0 6px;font-size:18px;color:var(--text)}
+  .proposal .tagline{color:var(--muted);font-size:13px;margin-bottom:14px;min-height:34px}
+  .proposal pre{background:#0b1224;border:1px solid var(--line);border-radius:8px;
+                padding:14px 16px;overflow:auto;font-size:11.5px;line-height:1.55;color:#cbd5e1;
+                max-height:520px;margin:10px 0}
+  .file-list{font-size:12.5px;color:#cbd5e1;margin:8px 0 0;padding:10px 14px;
+             background:#0b1224;border-radius:6px;border-left:3px solid var(--accent)}
+  .file-list .add::before{content:"+";color:var(--ok);margin-right:6px;font-weight:bold}
+  .file-list .mod::before{content:"~";color:var(--warn);margin-right:6px;font-weight:bold}
+  .file-list li{list-style:none;padding:2px 0;font-family:"SF Mono",Consolas,monospace;font-size:12px}
+  .pro-con{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+  .pro-con div{padding:10px 12px;border-radius:6px;font-size:12.5px}
+  .pro-con .pros{background:#052e16;border-left:3px solid var(--ok)}
+  .pro-con .cons{background:#3f1d1d;border-left:3px solid var(--err)}
+  .pro-con b{display:block;margin-bottom:4px;font-size:12px}
+  .pro-con .pros b{color:#86efac}
+  .pro-con .cons b{color:#fca5a5}
+  .pro-con ul{margin:0;padding-left:18px;color:#cbd5e1}
+  .pro-con li{margin:3px 0}
+
+  /* yaml syntax (lightweight) */
+  pre code .k{color:#7dd3fc}
+  pre code .s{color:#86efac}
+  pre code .n{color:#fbbf24}
+  pre code .c{color:#64748b;font-style:italic}
+  pre code .o{color:#f472b6}
+  pre code .r{color:#f472b6;font-style:italic}  /* placeholder ref */
+
+  /* choose section */
+  .choose{margin-top:36px;background:var(--panel);border:1px solid var(--line);
+          border-radius:12px;padding:24px}
+  .choose h2{margin-top:0}
+  .btn-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px}
+  .btn{background:#0b1224;border:2px solid var(--line);color:var(--text);padding:14px 22px;
+       border-radius:8px;cursor:pointer;font-size:14px;font-family:inherit;font-weight:500;
+       transition:.2s;min-width:140px}
+  .btn:hover{transform:translateY(-2px)}
+  .btn.A{border-color:#22c55e}
+  .btn.A:hover{background:#052e16}
+  .btn.B{border-color:#38bdf8}
+  .btn.B:hover{background:#0c2a4a}
+  .btn.C{border-color:#f59e0b}
+  .btn.C:hover{background:#4a2e08}
+  .btn.selected{background:#0c2a4a;border-width:2px;box-shadow:0 0 16px rgba(56,189,248,.45)}
+  .feedback{margin-top:18px;padding:16px 20px;background:#0b1224;border-radius:8px;
+            border-left:4px solid var(--accent);display:none}
+  .feedback.show{display:block;animation:slide .3s ease}
+  @keyframes slide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+  .feedback h4{margin:0 0 8px;color:var(--accent)}
+  .feedback p{margin:6px 0;font-size:13.5px}
+  .feedback .copyme{background:#1e293b;padding:10px 14px;border-radius:6px;
+                    font-family:"SF Mono",Consolas,monospace;font-size:13px;color:#fbbf24;
+                    margin-top:10px;border:1px dashed var(--accent)}
+
+  .note{background:#1e293b;border-left:3px solid var(--warn);padding:10px 14px;
+        border-radius:4px;margin:14px 0;font-size:13.5px;color:#fde68a}
+  .note strong{color:var(--warn)}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>后端流程 YAML 化 · 3 方案三选一</h1>
+  <p>
+    当前 chip-backend-ai 的"后端开发流程"散落在 5 处（state_manager.TRANSITIONS、workspace.DEFAULT_STAGES、global_spec_template.stages、run-chip-flow SKILL 的散文决策树、5 个 AGENT.md）。
+    目标是用<b>一份 <code>flow.yaml</code></b> 作为流程的唯一定义。每个阶段除了声明执行者，还显式声明 <b>inputs / outputs</b>，让流程同时是数据流契约。
+  </p>
+</header>
+
+<main>
+
+<div class="split-banner">
+  <div class="col">
+    <h4>flow.yaml &nbsp;<span style="font-weight:normal;color:var(--muted);font-size:12px">· 插件内 1 份，所有项目共用</span></h4>
+    <p>定义<b>结构 + 数据流</b>：阶段顺序、每阶段用哪个 subagent/skill、读哪些文件、写哪些文件、失败做什么。
+       结构基本不变，所以共享。本次比选的就是这份文件的形态。</p>
+  </div>
+  <div class="col">
+    <h4>global_spec.yaml &nbsp;<span style="font-weight:normal;color:var(--muted);font-size:12px">· 每个 workspace 1 份（已存在）</span></h4>
+    <p>定义<b>参数</b>：utilization 区间、congestion 阈值、retry 预算具体数值、PPA 目标。
+       这些每个项目都不一样，本来就是 per-workspace 的，不在本次讨论范围。</p>
+  </div>
+</div>
+
+<div class="io-banner">
+  <h4>每个 stage 的契约：executor + inputs + outputs</h4>
+  <p>
+    flow.yaml 中每个 stage 都声明"用什么执行（subagent 或 skill）、读哪些文件、产出哪些文件"。
+    编排器在 dispatch 前能校验输入就绪，把解析后的具体路径注入 sub-agent prompt；
+    sub-agent 自身不需要硬编码任何路径，跨阶段数据依赖（如 CTS 用 Floorplan 产出的 checkpoint）由 <code>{stages.X.outputs.Y}</code> 显式引用。
+  </p>
+  <div class="keys">
+    <span><b>{ws}</b> = workspace 根路径</span>
+    <span><b>{run_id}</b> = 当次 run（dispatch 时解析为 run_001 等）</span>
+    <span><b>{stages.X.outputs.Y}</b> = 跨 stage 引用上游声明的输出</span>
+    <span><b>executor.type</b> = subagent | skill</span>
+  </div>
+</div>
+
+<h2>维度对比矩阵</h2>
+<table class="matrix">
+  <thead>
+    <tr>
+      <th>维度</th>
+      <th>A · 增强 Stage List</th>
+      <th>B · DAG 工作流</th>
+      <th>C · 全状态机 YAML</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>表达力</td>
+        <td><span class="pill low">线性管道</span></td>
+        <td><span class="pill mid">图 + 条件</span></td>
+        <td><span class="pill high">图 + 全 FSM</span></td></tr>
+    <tr><td>改 Python 文件数</td>
+        <td><span class="pill low">3</span></td>
+        <td><span class="pill mid">4</span></td>
+        <td><span class="pill high">5</span></td></tr>
+    <tr><td>新增 YAML 复杂度</td>
+        <td><span class="pill low">低</span></td>
+        <td><span class="pill mid">中</span></td>
+        <td><span class="pill high">高</span></td></tr>
+    <tr><td>引入 DSL（<code>when:</code> 表达式）</td>
+        <td><span class="pill no">否</span></td>
+        <td><span class="pill yes">是</span></td>
+        <td><span class="pill yes">是</span></td></tr>
+    <tr><td>数据依赖如何表达</td>
+        <td><span class="pill mid">inputs 引用</span></td>
+        <td><span class="pill low">inputs + 自动推 deps</span></td>
+        <td><span class="pill mid">inputs 引用</span></td></tr>
+    <tr><td>学习成本</td>
+        <td><span class="pill low">低</span></td>
+        <td><span class="pill mid">中</span></td>
+        <td><span class="pill high">高</span></td></tr>
+    <tr><td>未来加并行 corner</td>
+        <td><span class="pill high">改架构</span></td>
+        <td><span class="pill low">加节点</span></td>
+        <td><span class="pill low">加节点</span></td></tr>
+    <tr><td>未来改状态机本身</td>
+        <td><span class="pill mid">改 Python</span></td>
+        <td><span class="pill mid">改 Python</span></td>
+        <td><span class="pill low">改 YAML</span></td></tr>
+    <tr><td>现有 simulator 兼容性</td>
+        <td colspan="3" style="text-align:center"><span class="pill low">三个方案均完全兼容</span></td></tr>
+  </tbody>
+</table>
+
+<h2>3 个方案详细对比</h2>
+
+<div class="proposals">
+
+  <!-- A -->
+  <div class="proposal A">
+    <h3>方案 A · 增强 Stage List</h3>
+    <div class="tagline">最小改动 · 务实推进 · 线性管道 + 显式 I/O 契约</div>
+    <pre><code><span class="c"># plugins/chip-backend-ai/flows/flow.yaml （新增 · 插件内 1 份）</span>
+<span class="k">flow:</span>
+  <span class="k">name:</span> <span class="s">standard_backend_flow</span>
+  <span class="k">version:</span> <span class="n">1</span>
+  <span class="k">stages:</span>
+    - <span class="k">id:</span> <span class="s">floorplan</span>
+      <span class="k">executor:</span> { <span class="k">type:</span> <span class="s">subagent</span>, <span class="k">name:</span> <span class="s">floorplan-agent</span> }
+      <span class="k">inputs:</span>
+        - <span class="s">"{ws}/spec/global_spec.yaml"</span>
+        - <span class="s">"{ws}/spec/stages/floorplan.yaml"</span>
+      <span class="k">outputs:</span>
+        <span class="k">meta:</span>       <span class="s">"{ws}/stages/floorplan/{run_id}/_meta.yaml"</span>
+        <span class="k">eval:</span>       <span class="s">"{ws}/stages/floorplan/{run_id}/eval_result.yaml"</span>
+        <span class="k">checkpoint:</span> <span class="s">"{ws}/checkpoints/post_floorplan_{run_id}.def"</span>
+        <span class="k">artifacts:</span>  <span class="s">"{ws}/stages/floorplan/{run_id}/artifacts/"</span>
+      <span class="k">on_fail:</span> <span class="s">revise_spec</span>
+      <span class="k">rollback_to:</span> <span class="o">null</span>
+
+    - <span class="k">id:</span> <span class="s">cts</span>
+      <span class="k">executor:</span> { <span class="k">type:</span> <span class="s">subagent</span>, <span class="k">name:</span> <span class="s">cts-agent</span> }
+      <span class="k">inputs:</span>
+        - <span class="s">"{ws}/spec/stages/cts.yaml"</span>
+        - <span class="r">"{stages.floorplan.outputs.checkpoint}"</span>     <span class="c"># 数据依赖</span>
+      <span class="k">outputs:</span>
+        <span class="k">meta:</span>       <span class="s">"{ws}/stages/cts/{run_id}/_meta.yaml"</span>
+        <span class="k">eval:</span>       <span class="s">"{ws}/stages/cts/{run_id}/eval_result.yaml"</span>
+        <span class="k">checkpoint:</span> <span class="s">"{ws}/checkpoints/post_cts_{run_id}.def"</span>
+      <span class="k">on_fail:</span> <span class="s">rollback</span>
+      <span class="k">rollback_to:</span> <span class="s">floorplan</span>
+
+    - <span class="k">id:</span> <span class="s">route</span>
+      <span class="k">executor:</span> { <span class="k">type:</span> <span class="s">subagent</span>, <span class="k">name:</span> <span class="s">route-agent</span> }
+      <span class="k">inputs:</span>
+        - <span class="s">"{ws}/spec/stages/route.yaml"</span>
+        - <span class="r">"{stages.cts.outputs.checkpoint}"</span>
+      <span class="k">outputs:</span>
+        <span class="k">meta:</span>       <span class="s">"{ws}/stages/route/{run_id}/_meta.yaml"</span>
+        <span class="k">eval:</span>       <span class="s">"{ws}/stages/route/{run_id}/eval_result.yaml"</span>
+        <span class="k">checkpoint:</span> <span class="s">"{ws}/checkpoints/post_route_{run_id}.def"</span>
+      <span class="k">on_fail:</span> <span class="s">rollback</span>
+      <span class="k">rollback_to:</span> <span class="s">cts</span>
+
+  <span class="k">on_demand:</span>
+    - <span class="k">id:</span> <span class="s">timing_eco</span>
+      <span class="k">executor:</span> { <span class="k">type:</span> <span class="s">subagent</span>, <span class="k">name:</span> <span class="s">timing-eco-agent</span> }
+      <span class="k">inputs:</span>
+        - <span class="r">"{stages.last_passed.outputs.checkpoint}"</span>   <span class="c"># 当前最后一个 pass</span>
+      <span class="k">outputs:</span>
+        <span class="k">meta:</span>       <span class="s">"{ws}/stages/timing_eco/{run_id}/_meta.yaml"</span>
+        <span class="k">eval:</span>       <span class="s">"{ws}/stages/timing_eco/{run_id}/eval_result.yaml"</span>
+      <span class="k">trigger:</span> <span class="s">orchestrator</span>
+
+  <span class="k">termination:</span>
+    <span class="k">all_stages_passed:</span> <span class="o">true</span>
+    <span class="k">timing_signoff:</span> <span class="o">true</span>
+
+<span class="c"># retry 次数、PPA 目标等数值 → workspace 的 global_spec.yaml</span></code></pre>
+    <ul class="file-list">
+      <li class="add">plugins/chip-backend-ai/flows/flow.yaml</li>
+      <li class="add">core/workflow/flow_loader.py <span style="color:var(--muted)">(加载 + 占位符解析)</span></li>
+      <li class="mod">core/workflow/workspace.py <span style="color:var(--muted)">(删 DEFAULT_STAGES)</span></li>
+      <li class="mod">core/workflow/state_manager.py</li>
+      <li class="mod">skills/run-chip-flow/SKILL.md <span style="color:var(--muted)">(Phase C/D 改为查 flow)</span></li>
+      <li class="mod">templates/global_spec_template.yaml</li>
+    </ul>
+    <div class="pro-con">
+      <div class="pros"><b>优点</b><ul>
+        <li>I/O 显式：编排器能 dispatch 前校验输入</li>
+        <li>Sub-agent 不再硬编码路径，由编排器注入</li>
+        <li>不破现有心智模型，最容易迁移</li>
+      </ul></div>
+      <div class="cons"><b>缺点</b><ul>
+        <li>不支持并行 / 条件分支</li>
+        <li>状态机仍硬编码在 Python</li>
+        <li>未来加多 corner 要再改架构</li>
+      </ul></div>
+    </div>
+  </div>
+
+  <!-- B -->
+  <div class="proposal B">
+    <h3>方案 B · DAG 工作流</h3>
+    <div class="tagline">中等改动 · 工业可扩展 · 数据流即依赖图</div>
+    <pre><code><span class="c"># plugins/chip-backend-ai/flows/flow.yaml （新增 · 插件内 1 份）</span>
+<span class="k">flow:</span>
+  <span class="k">name:</span> <span class="s">standard_backend_flow</span>
+  <span class="k">version:</span> <span class="n">1</span>
+  <span class="k">nodes:</span>
+    <span class="k">floorplan:</span>
+      <span class="k">executor:</span> { <span class="k">type:</span> <span class="s">subagent</span>, <span class="k">name:</span> <span class="s">floorplan-agent</span> }
+      <span class="k">inputs:</span>
+        - <span class="s">"{ws}/spec/stages/floorplan.yaml"</span>
+      <span class="k">outputs:</span>
+        <span class="k">meta:</span>       <span class="s">"{ws}/stages/floorplan/{run_id}/_meta.yaml"</span>
+        <span class="k">eval:</span>       <span class="s">"{ws}/stages/floorplan/{run_id}/eval_result.yaml"</span>
+        <span class="k">checkpoint:</span> <span class="s">"{ws}/checkpoints/post_floorplan_{run_id}.def"</span>
+      <span class="k">on_fail:</span> { <span class="k">action:</span> <span class="s">revise_spec</span> }
+
+    <span class="k">cts:</span>
+      <span class="k">executor:</span> { <span class="k">type:</span> <span class="s">subagent</span>, <span class="k">name:</span> <span class="s">cts-agent</span> }
+      <span class="k">inputs:</span>
+        - <span class="s">"{ws}/spec/stages/cts.yaml"</span>
+        - <span class="r">"{nodes.floorplan.outputs.checkpoint}"</span>      <span class="c"># 依赖 = 数据依赖</span>
+      <span class="k">outputs:</span>
+        <span class="k">meta:</span>       <span class="s">"{ws}/stages/cts/{run_id}/_meta.yaml"</span>
+        <span class="k">eval:</span>       <span class="s">"{ws}/stages/cts/{run_id}/eval_result.yaml"</span>
+        <span class="k">checkpoint:</span> <span class="s">"{ws}/checkpoints/post_cts_{run_id}.def"</span>
+      <span class="k">on_fail:</span> { <span class="k">action:</span> <span class="s">rollback</span>, <span class="k">target:</span> <span class="s">floorplan</span> }
+
+    <span class="k">route:</span>
+      <span class="k">executor:</span> { <span class="k">type:</span> <span class="s">subagent</span>, <span class="k">name:</span> <span class="s">route-agent</span> }
+      <span class="k">inputs:</span>
+        - <span class="s">"{ws}/spec/stages/route.yaml"</span>
+        - <span class="r">"{nodes.cts.outputs.checkpoint}"</span>
+      <span class="k">outputs:</span>
+        <span class="k">meta:</span>       <span class="s">"{ws}/stages/route/{run_id}/_meta.yaml"</span>
+        <span class="k">eval:</span>       <span class="s">"{ws}/stages/route/{run_id}/eval_result.yaml"</span>
+        <span class="k">checkpoint:</span> <span class="s">"{ws}/checkpoints/post_route_{run_id}.def"</span>
+      <span class="k">on_fail:</span> { <span class="k">action:</span> <span class="s">rollback</span>, <span class="k">target:</span> <span class="s">cts</span> }
+
+    <span class="k">timing_eco:</span>
+      <span class="k">executor:</span> { <span class="k">type:</span> <span class="s">subagent</span>, <span class="k">name:</span> <span class="s">timing-eco-agent</span> }
+      <span class="k">inputs:</span>
+        - <span class="r">"{nodes.route.outputs.checkpoint}"</span>
+      <span class="k">outputs:</span>
+        <span class="k">meta:</span>       <span class="s">"{ws}/stages/timing_eco/{run_id}/_meta.yaml"</span>
+        <span class="k">eval:</span>       <span class="s">"{ws}/stages/timing_eco/{run_id}/eval_result.yaml"</span>
+      <span class="k">when:</span> <span class="s">"metrics.timing.wns_ns &lt; -0.1"</span>           <span class="c"># 条件触发</span>
+
+  <span class="k">termination:</span>
+    <span class="k">when:</span> <span class="s">"nodes(['floorplan','cts','route']).all_passed"</span></code></pre>
+    <ul class="file-list">
+      <li class="add">plugins/chip-backend-ai/flows/flow.yaml</li>
+      <li class="add">core/workflow/flow_loader.py</li>
+      <li class="add">core/workflow/flow_engine.py <span style="color:var(--muted)">(拓扑 + when DSL + 输入就绪检查)</span></li>
+      <li class="add">docs/flow_dsl_spec.md</li>
+      <li class="mod">core/workflow/workspace.py</li>
+      <li class="mod">core/workflow/state_manager.py</li>
+      <li class="mod">skills/run-chip-flow/SKILL.md</li>
+    </ul>
+    <div class="pro-con">
+      <div class="pros"><b>优点</b><ul>
+        <li>数据依赖即图依赖，<code>deps:</code> 自动从 inputs 推导</li>
+        <li>未来加并行 corner / 多 mode 是加节点</li>
+        <li>timing_eco 条件触发有数据依据</li>
+      </ul></div>
+      <div class="cons"><b>缺点</b><ul>
+        <li>需要定义受限 <code>when:</code> DSL</li>
+        <li>编排器 prompt 复杂度上升</li>
+        <li>调试图执行比线性管道难</li>
+      </ul></div>
+    </div>
+  </div>
+
+  <!-- C -->
+  <div class="proposal C">
+    <h3>方案 C · 完整状态机 YAML</h3>
+    <div class="tagline">最大改动 · 最显式 · 状态机 + I/O 契约一并搬进 YAML</div>
+    <pre><code><span class="c"># plugins/chip-backend-ai/flows/flow.yaml （新增 · 插件内 1 份）</span>
+<span class="k">flow:</span>
+  <span class="k">name:</span> <span class="s">standard_backend_flow</span>
+  <span class="k">initial:</span> <span class="s">INIT</span>
+  <span class="k">states:</span>
+    <span class="k">INIT:</span>
+      <span class="k">on:</span> { <span class="k">human_input:</span> <span class="s">SPEC_DRAFTING</span> }
+    <span class="k">SPEC_DRAFTING:</span>
+      <span class="k">entry:</span> <span class="s">spawn(spec-agent)</span>
+      <span class="k">on:</span> { <span class="k">spec_ready:</span> <span class="s">SPEC_REVIEW</span> }
+    <span class="k">SPEC_REVIEW:</span>
+      <span class="k">on:</span>
+        <span class="k">human_approved:</span> <span class="s">SCHEDULING</span>
+        <span class="k">human_rejected:</span> <span class="s">SPEC_DRAFTING</span>
+    <span class="k">SCHEDULING:</span>
+      <span class="k">entry:</span> <span class="s">decide_next</span>
+      <span class="k">decisions:</span>
+        - <span class="k">when:</span> <span class="s">"all_stages.status == 'passed'"</span>
+          <span class="k">to:</span> <span class="s">COMPLETED</span>
+        - <span class="k">when:</span> <span class="s">"budget.exhausted"</span>
+          <span class="k">to:</span> <span class="s">ABORTED</span>
+        - <span class="k">when:</span> <span class="s">"last_eval.overall == 'fail' and stage.retry &lt; budget.max"</span>
+          <span class="k">to:</span> <span class="s">STAGE_RUNNING</span>
+          <span class="k">action:</span> <span class="s">retry</span>
+    <span class="k">STAGE_RUNNING:</span>
+      <span class="k">entry:</span> <span class="s">spawn(${current_stage.executor})</span>
+      <span class="k">on:</span> { <span class="k">agent_done:</span> <span class="s">SCHEDULING</span> }
+    <span class="k">COMPLETED:</span> { <span class="k">final:</span> <span class="o">true</span> }
+    <span class="k">ABORTED:</span> { <span class="k">final:</span> <span class="o">true</span> }
+
+  <span class="k">stages:</span>
+    - <span class="k">id:</span> <span class="s">floorplan</span>
+      <span class="k">executor:</span> { <span class="k">type:</span> <span class="s">subagent</span>, <span class="k">name:</span> <span class="s">floorplan-agent</span> }
+      <span class="k">deps:</span> []
+      <span class="k">inputs:</span>
+        - <span class="s">"{ws}/spec/stages/floorplan.yaml"</span>
+      <span class="k">outputs:</span>
+        <span class="k">meta:</span>       <span class="s">"{ws}/stages/floorplan/{run_id}/_meta.yaml"</span>
+        <span class="k">eval:</span>       <span class="s">"{ws}/stages/floorplan/{run_id}/eval_result.yaml"</span>
+        <span class="k">checkpoint:</span> <span class="s">"{ws}/checkpoints/post_floorplan_{run_id}.def"</span>
+
+    - <span class="k">id:</span> <span class="s">cts</span>
+      <span class="k">executor:</span> { <span class="k">type:</span> <span class="s">subagent</span>, <span class="k">name:</span> <span class="s">cts-agent</span> }
+      <span class="k">deps:</span> [<span class="s">floorplan</span>]
+      <span class="k">inputs:</span>
+        - <span class="s">"{ws}/spec/stages/cts.yaml"</span>
+        - <span class="r">"{stages.floorplan.outputs.checkpoint}"</span>
+      <span class="k">outputs:</span>
+        <span class="k">meta:</span>       <span class="s">"{ws}/stages/cts/{run_id}/_meta.yaml"</span>
+        <span class="k">eval:</span>       <span class="s">"{ws}/stages/cts/{run_id}/eval_result.yaml"</span>
+        <span class="k">checkpoint:</span> <span class="s">"{ws}/checkpoints/post_cts_{run_id}.def"</span>
+
+    - <span class="k">id:</span> <span class="s">route</span>
+      <span class="k">executor:</span> { <span class="k">type:</span> <span class="s">subagent</span>, <span class="k">name:</span> <span class="s">route-agent</span> }
+      <span class="k">deps:</span> [<span class="s">cts</span>]
+      <span class="k">inputs:</span>
+        - <span class="s">"{ws}/spec/stages/route.yaml"</span>
+        - <span class="r">"{stages.cts.outputs.checkpoint}"</span>
+      <span class="k">outputs:</span>
+        <span class="k">meta:</span>       <span class="s">"{ws}/stages/route/{run_id}/_meta.yaml"</span>
+        <span class="k">eval:</span>       <span class="s">"{ws}/stages/route/{run_id}/eval_result.yaml"</span>
+        <span class="k">checkpoint:</span> <span class="s">"{ws}/checkpoints/post_route_{run_id}.def"</span></code></pre>
+    <ul class="file-list">
+      <li class="add">plugins/chip-backend-ai/flows/flow.yaml</li>
+      <li class="add">core/workflow/flow_loader.py</li>
+      <li class="add">core/workflow/flow_engine.py</li>
+      <li class="add">docs/flow_dsl_spec.md</li>
+      <li class="mod">core/workflow/workspace.py</li>
+      <li class="mod">core/workflow/state_manager.py <span style="color:var(--muted)">(删 TRANSITIONS，从 YAML 加载)</span></li>
+      <li class="mod">skills/run-chip-flow/SKILL.md <span style="color:var(--muted)">(Phase C 整段重写)</span></li>
+    </ul>
+    <div class="pro-con">
+      <div class="pros"><b>优点</b><ul>
+        <li>唯一真源 —— FSM + I/O 全部 YAML</li>
+        <li>可直接生成状态图和数据流图</li>
+        <li>未来加新状态无需动 Python</li>
+      </ul></div>
+      <div class="cons"><b>缺点</b><ul>
+        <li>YAML 嵌套深，写起来啰嗦</li>
+        <li>DSL 表达式集需严格定义</li>
+        <li>当前业务复杂度可能用不到这种灵活性</li>
+      </ul></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="note">
+  <strong>共性提示：</strong>
+  三个方案的 stage schema 完全一致 —— <code>id / executor / inputs / outputs / on_fail</code>。
+  区别只在<b>顶层组织方式</b>：A 用平坦 stage 数组，B 用 nodes 字典（依赖从 inputs 推导），C 在 stages 之外加上 states/transitions 块。<br>
+  <code>executor.type</code> 当前两种：<code>subagent</code>（走 Agent 工具）与 <code>skill</code>（走 Skill 工具）。
+  当前 5 个领域 Agent 都是 subagent；未来想把某个轻量步骤换成 skill 实现，只改这个字段，编排器无感。<br>
+  三个方案对 <code>stage_simulator.py</code> 完全兼容 —— I/O 契约只决定"路径怎么传给 agent"，不决定"agent 怎么跑"。
+</div>
+
+<section class="choose">
+  <h2>选择一个方案</h2>
+  <p style="margin:0;color:var(--muted);font-size:13.5px">
+    点击下方按钮挑选你倾向的方案。选定后页面会显示一段提示文本，把它告诉我，我会基于该方案进入下一轮实现 plan。
+  </p>
+  <div class="btn-row">
+    <button class="btn A" data-pick="A">选 方案 A</button>
+    <button class="btn B" data-pick="B">选 方案 B</button>
+    <button class="btn C" data-pick="C">选 方案 C</button>
+  </div>
+  <div class="feedback" id="feedback">
+    <h4 id="fb-title">已选：方案 X</h4>
+    <p id="fb-summary"></p>
+    <p style="color:var(--muted);font-size:13px;margin-top:14px">
+      把下面这句话复制回对话框告诉我，我就进入下一轮的实现 plan：
+    </p>
+    <div class="copyme" id="fb-copy"></div>
+  </div>
+</section>
+
+</main>
+
+<script>
+  const SUMMARIES = {
+    A: '渐进式 · 平坦 stage 数组 + executor/inputs/outputs 显式契约。线性管道，不引入 DSL，最快可落地。改 3 个 Python 文件。',
+    B: 'DAG 工作流 · nodes 字典 + inputs 自动推导依赖 + when 条件触发。未来加并行 corner / power planning 都是加节点。改 4 个 Python 文件。',
+    C: '完整状态机 YAML · FSM + 阶段 I/O 契约全部数据化。改流程完全不用动 Python。引入 DSL + 重写 Phase C，改 5 个 Python 文件。',
+  };
+
+  function showFeedback(pick) {
+    document.querySelectorAll('.btn').forEach(b => b.classList.toggle('selected', b.dataset.pick === pick));
+    const fb = document.getElementById('feedback');
+    document.getElementById('fb-title').textContent = `已选：方案 ${pick}`;
+    document.getElementById('fb-summary').textContent = SUMMARIES[pick];
+    document.getElementById('fb-copy').textContent = `我选方案 ${pick}，请基于此进入实现 plan。`;
+    fb.classList.add('show');
+    fb.scrollIntoView({behavior:'smooth', block:'nearest'});
+  }
+
+  document.querySelectorAll('.btn').forEach(b => {
+    b.addEventListener('click', () => showFeedback(b.dataset.pick));
+  });
+</script>
+</body>
+</html>

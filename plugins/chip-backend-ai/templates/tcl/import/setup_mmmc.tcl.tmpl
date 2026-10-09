@@ -1,0 +1,24 @@
+# ===========================================================================
+# setup_mmmc.tcl  —  golden template, rendered by render-tcl
+#   Configure MMMC analysis views + load SDC constraints.
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- library sets (per corner) ---------------------------------------------
+create_library_set -name {{libset_name}} -timing { {{lib}} }
+
+# --- delay corner + RC ------------------------------------------------------
+create_rc_corner -name {{rc_corner}} -temperature {{temperature}}
+create_delay_corner -name {{delay_corner}} \
+    -library_set {{libset_name}} -rc_corner {{rc_corner}}
+
+# --- constraint mode (SDC) --------------------------------------------------
+create_constraint_mode -name {{constraint_mode}} -sdc_files { {{sdc}} }
+
+# --- analysis view + activate ----------------------------------------------
+create_analysis_view -name {{analysis_view}} \
+    -constraint_mode {{constraint_mode}} -delay_corner {{delay_corner}}
+
+### @inject:extra_views
+
+set_analysis_view -setup { {{analysis_view}} } -hold { {{analysis_view}} }

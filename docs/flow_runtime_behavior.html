@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>chip-backend-ai · 终态运行行为</title>
+<style>
+  :root{
+    --bg:#faf9f5;--surface:#fff;--surface2:#f1efe8;
+    --text:#26241f;--text2:#5f5e5a;--text3:#8a8980;
+    --border:rgba(0,0,0,.12);--border2:rgba(0,0,0,.22);
+    --accent:#534ab7;--accent-bg:#eeedfe;
+    --ok:#0f6e56;--ok-bg:#e1f5ee;
+    --warn:#854f0b;--warn-bg:#faeeda;
+    --info:#185fa5;--info-bg:#e6f1fb;
+    --red:#a32d2d;--red-bg:#fcebeb;
+    --shadow:0 1px 2px rgba(0,0,0,.05);--radius:12px;--radius-sm:8px;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  [data-theme="dark"]{
+    --bg:#1c1b19;--surface:#262522;--surface2:#2f2e2a;
+    --text:#e9e7e1;--text2:#b4b2a9;--text3:#888780;
+    --border:rgba(255,255,255,.14);--border2:rgba(255,255,255,.26);
+    --accent:#afa9ec;--accent-bg:#2c2750;
+    --ok:#5dcaa5;--ok-bg:#0f3d31;
+    --warn:#ef9f27;--warn-bg:#4a3208;
+    --info:#85b7eb;--info-bg:#0c3357;
+    --red:#f09595;--red-bg:#501313;--shadow:none;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.65;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:920px;margin:0 auto;padding:32px 22px 60px}
+  code{font-family:var(--mono);font-size:.86em;background:var(--surface2);padding:1px 5px;border-radius:4px}
+  h1{font-size:23px;font-weight:600;letter-spacing:-.01em}
+  h2{font-size:17px;font-weight:600;margin:30px 0 12px}
+  .sub{color:var(--text2);font-size:14px;margin-top:4px}
+  .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+  .toggle{flex-shrink:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:999px;padding:7px 14px;font-size:13px;cursor:pointer;font-family:var(--sans);display:flex;gap:6px;align-items:center}
+  .toggle:hover{border-color:var(--border2);color:var(--text)}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:16px}
+  .chip{font-size:12.5px;padding:4px 11px;border-radius:999px;background:var(--surface2);color:var(--text2);border:1px solid var(--border)}
+  .chip.ok{background:var(--ok-bg);color:var(--ok);border-color:transparent}
+  .chip.accent{background:var(--accent-bg);color:var(--accent);border-color:transparent}
+
+  .sm{display:flex;flex-wrap:wrap;align-items:center;gap:5px}
+  .st{background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:7px 13px;font-size:12.5px;font-weight:500;box-shadow:var(--shadow);white-space:nowrap}
+  .st.term-ok{background:var(--ok-bg);color:var(--ok);border-color:transparent}
+  .st.term-no{background:var(--red-bg);color:var(--red);border-color:transparent}
+  .sar{color:var(--text3);font-size:15px}
+
+  .phases{display:flex;flex-direction:column;gap:9px}
+  .ph{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+  .ph .hd{display:flex;align-items:center;gap:11px;padding:13px 16px;cursor:pointer}
+  .ph .hd:hover{background:var(--surface2)}
+  .ph .num{flex-shrink:0;width:26px;height:26px;border-radius:50%;background:var(--accent-bg);color:var(--accent);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+  .ph .ti{flex:1}
+  .ph .tt{font-size:15px;font-weight:500}
+  .ph .ss{font-size:12.5px;color:var(--text3);margin-top:1px}
+  .ph .stt{font-family:var(--mono);font-size:11px;color:var(--text3)}
+  .ph .cv{font-size:16px;color:var(--text3);transition:.2s}
+  .ph.open .cv{transform:rotate(90deg)}
+  .ph .bd{display:none;padding:0 16px 14px 53px}
+  .ph.open .bd{display:block;animation:fade .2s ease}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  .ph .bd ul{list-style:none}
+  .ph .bd li{font-size:13.5px;color:var(--text2);padding:4px 0 4px 16px;position:relative}
+  .ph .bd li:before{content:"–";position:absolute;left:0;color:var(--text3)}
+  .ph .bd li b{color:var(--text);font-weight:500}
+
+  .callout{border:1px solid var(--info-bg);background:var(--info-bg);border-radius:var(--radius);padding:13px 16px}
+  .callout .h{display:flex;align-items:center;gap:7px;font-weight:600;font-size:14px;color:var(--info)}
+  .callout p{font-size:13.5px;color:var(--info);margin-top:4px}
+
+  .sim{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow)}
+  .sim .q{font-size:13.5px;color:var(--text2);margin-bottom:10px}
+  .opts{display:flex;flex-wrap:wrap;gap:7px}
+  .opt{background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:7px 13px;font-size:12.5px;cursor:pointer;font-family:var(--sans);color:var(--text2)}
+  .opt:hover{border-color:var(--border2);color:var(--text)}
+  .opt.on{background:var(--accent-bg);border-color:var(--accent);color:var(--accent);font-weight:500}
+  .simout{margin-top:14px;border-top:1px dashed var(--border);padding-top:13px;font-size:13.5px;min-height:20px;animation:fade .2s ease}
+  .simout .act{font-weight:500;font-size:14px}
+  .simout .flow{font-family:var(--mono);font-size:12px;color:var(--text3);margin-top:6px}
+  .pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;font-weight:600;margin-left:6px}
+  .pl-ok{background:var(--ok-bg);color:var(--ok)} .pl-wn{background:var(--warn-bg);color:var(--warn)} .pl-no{background:var(--red-bg);color:var(--red)}
+
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:9px}
+  .sc{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:11px 13px;font-size:13px;display:flex;gap:9px;align-items:flex-start;box-shadow:var(--shadow)}
+  .sc .ic{flex-shrink:0;color:var(--ok);font-weight:600;margin-top:1px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div>
+      <h1>终态运行行为 · v0.3.3</h1>
+      <div class="sub">运行 <code>run-chip-flow</code> 后，从启动到收尾会如何表现</div>
+    </div>
+    <button class="toggle" id="themeBtn"><span id="themeIc">🌙</span><span id="themeTx">暗色</span></button>
+  </div>
+
+  <div class="chips">
+    <span class="chip accent">9 stage · 42 步</span>
+    <span class="chip ok">✓ mock 全跑通 42/42 · 8 gate</span>
+    <span class="chip">3 个 human 确认点</span>
+    <span class="chip">可断点续跑</span>
+  </div>
+
+  <h2>生命周期（状态机）</h2>
+  <div class="sm">
+    <span class="st">INIT</span><span class="sar">→</span>
+    <span class="st">SPEC_DRAFTING</span><span class="sar">→</span>
+    <span class="st">SPEC_REVIEW</span><span class="sar">→</span>
+    <span class="st">SCHEDULING</span><span class="sar">⇄</span>
+    <span class="st">STAGE_RUNNING</span><span class="sar">→</span>
+    <span class="st term-ok">COMPLETED</span>
+    <span class="sar">/</span>
+    <span class="st term-no">ABORTED</span>
+  </div>
+
+  <h2>一次运行会怎么走 <span style="font-size:12.5px;font-weight:400;color:var(--text3)">（点击展开）</span></h2>
+  <div class="phases" id="phases"></div>
+
+  <h2>失败时如何反应 <span style="font-size:12.5px;font-weight:400;color:var(--text3)">（点一个 gate 结果，看编排器怎么做）</span></h2>
+  <div class="sim">
+    <div class="q">假设某个阶段的 gate 评估结果是：</div>
+    <div class="opts" id="opts"></div>
+    <div class="simout" id="simout">选一个上面的结果。</div>
+  </div>
+
+  <h2>运行特征</h2>
+  <div class="cards" id="feat"></div>
+
+</div>
+
+<script>
+const PHASES=[
+ {t:"启动 & 工作区",s:"自动建工作区，env 仅 advisory",st:"INIT",
+  li:["运行 <b>run-chip-flow</b> → 自动在当前目录建 <code>.chipflow/</code> 工作区，无需选路径",
+      "检查 Innovus 是<b>建议性</b>的：没装也继续，后续 EDA 步骤自动走 mock",
+      "若给已有工作区，则读状态机从断点恢复"]},
+ {t:"Spec 生成 & 人审",s:"模糊目标 → 规格 → 你审批",st:"SPEC_DRAFTING → SPEC_REVIEW",
+  li:["你给一个模糊目标（如：1.0 GHz、确保时序收敛、route 后 DRC=0）",
+      "<b>spec-draft</b> 生成 <code>global_spec</code> + 9 个 stage spec，并做 PPA 预算分解",
+      "<b>暂停等你审批</b>；驳回则带反馈重draft",
+      "批准后，spec 的重试预算 / 单阶段重试上限<b>同步进运行时状态</b>"]},
+ {t:"调度 & 阶段执行",s:"flow_loader 逐步驱动 9 stage / 42 步",st:"SCHEDULING → STAGE_RUNNING",
+  li:["<b>AI 决策步</b> → 决策 skill 生成 <code>decisions.yaml</code>",
+      "<b>渲染</b> → render-tcl <b>自动注入工作区路径变量</b>，出具体 Tcl（无需手填）",
+      "<b>执行</b> → run-eda-script；无真实工具时走 <b>mock</b>，产出标 <code>SIMULATED</code> 的可解析报告",
+      "<b>gate</b> → parse-eda-report → <code>eval_result.yaml</code>",
+      "<b>human 步</b> → <b>暂停等确认</b>：confirm_macro / waiver_review / final_checklist"]},
+ {t:"每个 gate 后的决策",s:"pass / fail / partial 分支",st:"回到 SCHEDULING",
+  li:["<b>pass</b> → 派发下一 stage；全部通过 → COMPLETED",
+      "<b>fail</b> → 先<b>重试</b>到上限 → 建议回滚则 <b>rollback</b> 到上游（记 parent_run、耗预算）→ 预算耗尽则 <b>ABORTED</b> → 否则 <b>revise_spec</b> 改规格",
+      "<b>partial</b> → 不阻塞下一步则继续，否则按 fail 处理",
+      "每步决策都写入 <code>decisions.jsonl</code> 审计日志"]},
+ {t:"终结",s:"COMPLETED 出 GDS / ABORTED 报因",st:"COMPLETED | ABORTED",
+  li:["<b>COMPLETED</b>：产出 GDS + PPA 汇总，并<b>明确标注 simulated</b>（非真实 PPA）",
+      "<b>ABORTED</b>：报告失败原因、重试预算消耗、最后一次 eval 结果与建议",
+      "全程文件系统交接，<b>可断点续跑</b>：重进只需再调 flow_loader next"]},
+];
+const SIM=[
+ {k:"pass · 还有后续 stage",cls:"pl-ok",act:"派发下一个 stage",flow:"agent_done → SCHEDULING → dispatch（下一 stage）"},
+ {k:"pass · 全部通过",cls:"pl-ok",act:"流程完成，产出 GDS",flow:"all_passed → COMPLETED"},
+ {k:"fail · 重试未达上限",cls:"pl-wn",act:"重试同一 stage（retry_count +1）",flow:"dispatch（同 stage，新 run）"},
+ {k:"fail · 重试耗尽 + 建议回滚",cls:"pl-wn",act:"回滚到上游 stage",flow:"create-run --parent-run · increment-budget → dispatch（上游 stage）"},
+ {k:"fail · 全局预算耗尽",cls:"pl-no",act:"终止流程",flow:"budget_exhausted → ABORTED"},
+ {k:"fail · 重试耗尽 + 无回滚",cls:"pl-wn",act:"回到改规格放宽约束",flow:"revise_spec → SPEC_DRAFTING"},
+ {k:"partial · 失败项非阻塞",cls:"pl-ok",act:"带提示继续下一 stage",flow:"agent_done → SCHEDULING → dispatch"},
+];
+const FEAT=[
+ "mock 模式下端到端跑通：42/42 步、8 gate PASS、3 个 human 确认点",
+ "四条失败路径（retry / rollback / revise_spec / abort）均可真实触发",
+ "文件系统交接、append-only 审计；任意中断后可续跑",
+ "装 / 升级：bump 版本 + claude plugin update name@marketplace",
+];
+
+const phEl=document.getElementById("phases");
+PHASES.forEach((p,i)=>{
+ const d=document.createElement("div");d.className="ph";
+ d.innerHTML=`<div class="hd"><div class="num">${i+1}</div><div class="ti"><div class="tt">${p.t}</div><div class="ss">${p.s}</div></div><div class="stt">${p.st}</div><div class="cv">›</div></div><div class="bd"><ul>${p.li.map(x=>`<li>${x}</li>`).join("")}</ul></div>`;
+ d.querySelector(".hd").onclick=()=>d.classList.toggle("open");
+ phEl.appendChild(d);
+});
+document.querySelector(".ph").classList.add("open");
+
+const optEl=document.getElementById("opts"),outEl=document.getElementById("simout");
+SIM.forEach((s,i)=>{
+ const b=document.createElement("button");b.className="opt";b.textContent=s.k;
+ b.onclick=()=>{document.querySelectorAll(".opt").forEach(o=>o.classList.remove("on"));b.classList.add("on");
+   outEl.innerHTML=`<div class="act">编排器：${s.act}<span class="pill ${s.cls}">${s.k.split(" · ")[0]}</span></div><div class="flow">${s.flow}</div>`;};
+ optEl.appendChild(b);
+});
+
+const ftEl=document.getElementById("feat");
+FEAT.forEach(f=>{const d=document.createElement("div");d.className="sc";d.innerHTML=`<span class="ic">✓</span>${f}`;ftEl.appendChild(d);});
+
+const root=document.documentElement,tIc=document.getElementById("themeIc"),tTx=document.getElementById("themeTx");
+document.getElementById("themeBtn").onclick=()=>{const dk=root.getAttribute("data-theme")==="dark";
+ root.setAttribute("data-theme",dk?"light":"dark");tIc.textContent=dk?"🌙":"☀️";tTx.textContent=dk?"暗色":"亮色";};
+if(window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches){root.setAttribute("data-theme","dark");tIc.textContent="☀️";tTx.textContent="亮色";}
+</script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+# ===========================================================================
+# metal_fill.tcl  —  golden template, rendered by render-tcl
+#   Mechanical step: insert metal / dummy fill to meet per-layer density rules
+#   on the ECO-applied design, then write the filled DEF. No decision layer —
+#   params come straight from the stage spec + the artifact paths.
+#   double-brace placeholders filled from stage spec + parameters + --var.
+#   Produces filled.def (consumed by signoff_drc_lvs / signoff_ir_em / tapeout).
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- operate on the restored ECO-applied (timing-closed) design ------------
+#   (eco.def from the timing_eco stage is the design under construction here)
+
+# --- metal fill configuration (density window + layers) --------------------
+setMetalFill -layer { {{fill_metal_layers}} }
+setMetalFill -minDensity {{min_density}} -maxDensity {{max_density}}
+
+# --- insert dummy / metal fill to satisfy density DRC ----------------------
+addMetalFill -layer { {{fill_metal_layers}} } -timingAware true
+
+# --- report achieved density, then persist the filled design ---------------
+verify_density -outfile {{report_dir}}/metal_fill.rpt
+defOut {{artifact_dir}}/filled.def

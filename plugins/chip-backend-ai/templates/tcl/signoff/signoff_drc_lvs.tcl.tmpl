@@ -1,0 +1,28 @@
+# ===========================================================================
+# signoff_drc_lvs.tcl  —  golden template, rendered by render-tcl
+#   Mechanical step: signoff physical verification on the filled design —
+#   geometry / DRC against the foundry deck, LVS netlist-vs-layout, and
+#   antenna / ERC checks — then emit a parseable DRC/LVS report for the
+#   signoff_eval gate. No decision layer — params come from the stage spec.
+#   double-brace placeholders filled from stage spec + parameters + --var.
+#   Produces drc_lvs.rpt (the signoff_eval gate report; total violations line).
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- operate on the metal-filled design ------------------------------------
+#   (filled.def from metal_fill is the design under verification here)
+
+# --- signoff DRC / geometry against the foundry rule deck ------------------
+verify_drc -limit {{drc_report_limit}} -rule_deck {{drc_rule_deck}}
+verifyGeometry -allowDifferentCellViols
+
+# --- LVS: layout-vs-schematic with the LVS deck ----------------------------
+verifyConnectivity -type all -error {{drc_report_limit}}
+runLVS -rule_deck {{lvs_rule_deck}}
+
+# --- antenna / ERC residual checks -----------------------------------------
+verifyProcessAntenna
+
+# --- summarize all violations into the gate report -------------------------
+#   The signoff_eval gate parses the "total violations" line from THIS report.
+summarizeDrcLvs -outfile {{report_dir}}/drc_lvs.rpt

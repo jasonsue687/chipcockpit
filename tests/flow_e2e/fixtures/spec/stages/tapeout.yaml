@@ -1,0 +1,29 @@
+# SIMULATED fixture — tapeout stage spec for the e2e validation.
+# Derived from templates/stage_spec_template.yaml; modeled on route.yaml but
+# with NO metrics: tapeout has NO gate step (final_checklist is the human
+# terminal step), so there is nothing to evaluate — only mechanical chip
+# finishing + GDS streamout, then a human checklist, then flow_complete.
+#
+# Because there is no gate, this fixture intentionally omits `metrics:`. The
+# parameters below exist only to resolve the {{placeholders}} in
+# templates/tcl/tapeout/*.tcl.tmpl. Path-like vars (report_dir/artifact_dir)
+# come from the harness via --var, not here.
+
+stage: "tapeout"
+spec_version: "v1"
+
+description: "Tapeout / GDS delivery for the design (simulation). No quality gate — mechanical finishing + streamout + human checklist."
+
+parameters:
+  # --- chip_finishing (filler / seal ring / scribe) --------------------------
+  filler_cells: "FILLCAP64 FILLCAP32 FILL8 FILL4 FILL2 FILL1"  # standard-cell fillers (large→small)
+  seal_ring_width_um: 8             # addSealRing -width (die seal ring width, um)
+  scribe_width_um: 60               # addScribeLine -width (dicing channel width, um)
+  # --- streamout (GDSII export + merge) --------------------------------------
+  gds_layer_map: "gds_layer.map"    # streamOut -mapFile (DEF→GDS layer map)
+  gds_cell_name: "sim_block"        # streamOut -libName / top cell name in the GDS
+
+upstream:
+  required_checkpoint: null
+  required_stages:
+    - signoff

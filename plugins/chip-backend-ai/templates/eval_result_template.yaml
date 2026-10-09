@@ -1,0 +1,27 @@
+# eval_result.yaml Template — Sub-agent 自评估结果
+# 每次 run 产出一份，存放于 stages/<stage>/run_NNN/eval_result.yaml
+# 编排器据此决定 dispatch/retry/rollback/revise_spec
+
+stage: ""                              # 所属阶段
+run_id: ""                             # 对应的 run ID
+spec_version: ""                       # 基于哪个版本的 Spec 评估
+overall: "pass"                        # pass | fail | partial
+
+# 指标明细
+# 约束：每项必须同时记录 target 和 actual，不能只输出 pass/fail
+metrics:
+  - name: ""                           # 指标名
+    target:
+      min: null
+      max: null
+    actual: null                       # 实际数值
+    status: "pass"                     # pass | fail
+
+# Sub-agent 对编排器的建议（编排器可采纳也可覆盖）
+recommendation: "proceed"             # proceed | retry | rollback | escalate
+
+# recommendation=retry 时的上下文
+retry_context: null                    # 建议调整什么参数
+
+# recommendation=escalate 时的原因
+escalation_reason: null                # 为什么无法自行解决

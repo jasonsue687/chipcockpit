@@ -1,0 +1,21 @@
+# ===========================================================================
+# insert_tap_decap.tcl  —  golden template, rendered by render-tcl
+#   Mechanical step: insert well-tap / end-cap / decap cells (and power
+#   switches if applicable) on top of the built power grid. No decision layer.
+#   double-brace placeholders filled from stage spec + parameters + --var.
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- well taps at a fixed pitch to satisfy max-distance rules --------------
+addTapCell -cell {{tap_cell}} -distance {{tap_cell_distance_um}} \
+    -prefix TAP
+
+# --- end caps / boundary cells at row ends + macro edges -------------------
+addEndCap -preCap {{endcap_cell}} -postCap {{endcap_cell}} -prefix ENDCAP
+
+# --- decoupling caps to stabilize the rails (target density) ---------------
+addDeCapCell -cells {{decap_cell}} -totCap {{decap_density_pct}} \
+    -prefix DECAP
+
+# --- persist the design with tap/endcap/decap inserted ---------------------
+defOut {{artifact_dir}}/pg_full.def

@@ -1,0 +1,19 @@
+# ===========================================================================
+# gen_floorplan.tcl  —  golden template, rendered by render-tcl
+#   Define die/core size, shape, aspect ratio, target utilization.
+#   double-brace placeholders filled from stage spec + decisions(params) + --var;
+#   '### @inject:<block>' injects AI-authored fragments from decisions.fragments
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- initial floorplan: utilization-driven core sizing ---------------------
+floorPlan -site core \
+    -coreMarginsBy io \
+    -r {{aspect_ratio}} {{target_utilization}} \
+    {{core_to_io_margin_um}} {{core_to_io_margin_um}} \
+    {{core_to_io_margin_um}} {{core_to_io_margin_um}}
+
+### @inject:extra_floorplan_options
+
+# --- persist the initialized floorplan -------------------------------------
+defOut {{artifact_dir}}/fp_init.def

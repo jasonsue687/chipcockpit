@@ -1,0 +1,20 @@
+# ===========================================================================
+# macro_placement.tcl  —  golden template, rendered by render-tcl
+#   Macro placement: dataflow-driven location, orientation, channel width.
+#   double-brace placeholders filled from stage spec + decisions(params) + --var;
+#   '### @inject:<block>' injects AI-authored fragments from decisions.fragments
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- macro placement controls ----------------------------------------------
+setPlaceMode -place_global_place_macros true
+set_macro_place_constraint -min_channel_width {{macro_channel_width_um}}
+
+# --- auto macro placement seed (refined by AI fragment below) --------------
+place_design -concurrent_macros -macro_orientation {{macro_orientation}}
+
+# --- AI-authored explicit macro placements (placeLfrom / orientation) ------
+### @inject:macro_placement_cmds
+
+# --- persist floorplan with macros placed ----------------------------------
+defOut {{artifact_dir}}/fp_macro.def

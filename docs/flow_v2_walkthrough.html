@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>改造后完整流程 · 交互手册 (v0.4.0)</title>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#1e293b; --panel2:#273449; --line:#334155;
+    --text:#e2e8f0; --muted:#94a3b8; --accent:#38bdf8; --accent2:#22d3ee;
+    --design:#a78bfa; --mech:#38bdf8; --measure:#22c55e; --human:#f59e0b; --check:#2dd4bf;
+    --new:#f43f5e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"Segoe UI",Helvetica,"PingFang SC","Microsoft YaHei",sans-serif;
+       background:var(--bg);color:var(--text);line-height:1.55}
+  header{padding:26px 40px;background:linear-gradient(135deg,#0b1224 0%,#172554 100%);border-bottom:1px solid var(--line)}
+  header h1{margin:0;font-size:22px}
+  header p{margin:8px 0 0;color:var(--muted);font-size:13.5px;max-width:1100px}
+  header p b{color:var(--accent)}
+  .ver{display:inline-block;font-size:11px;background:#14532d;color:#bbf7d0;border-radius:6px;padding:2px 9px;margin-left:8px;font-weight:700}
+  nav.tabs{display:flex;flex-wrap:wrap;gap:6px;padding:12px 40px;background:#0b1224;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+  nav.tabs button{background:transparent;color:var(--muted);border:1px solid transparent;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-family:inherit}
+  nav.tabs button:hover{color:var(--text);background:#1e293b}
+  nav.tabs button.active{color:var(--accent);background:#0f1f3a;border-color:var(--accent)}
+  main{padding:24px 40px;max-width:1280px}
+  section{display:none;animation:fade .25s ease}
+  section.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  h2{font-size:19px;border-left:4px solid var(--accent);padding-left:12px;margin:6px 0 14px}
+  h3{font-size:15px;color:var(--accent2);margin-top:26px}
+  p{color:#cbd5e1;font-size:13.5px}
+  code{font-family:"SF Mono",Consolas,monospace;color:#fbbf24;font-size:12.5px}
+  .lead{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:15px 19px;margin:14px 0}
+  .lead b{color:var(--accent)}
+  /* metric cards */
+  .cards{display:flex;flex-wrap:wrap;gap:14px;margin:16px 0}
+  .card{flex:1 1 150px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;text-align:center}
+  .card .n{font-size:30px;font-weight:800;color:var(--accent)}
+  .card .l{font-size:12px;color:var(--muted);margin-top:3px}
+  .card.h .n{color:var(--human)} .card.g .n{color:var(--measure)} .card.d .n{color:var(--design)}
+  /* legend */
+  .legend{display:flex;gap:16px;flex-wrap:wrap;margin:14px 0;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:11px 16px;font-size:12.5px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+  .dot{width:12px;height:12px;border-radius:3px;display:inline-block}
+  .dot.design{background:var(--design)} .dot.mech{background:var(--mech)}
+  .dot.measure{background:var(--measure)} .dot.human{background:var(--human)} .dot.check{background:var(--check)}
+  .tag{display:inline-block;font-size:9.5px;padding:1px 7px;border-radius:8px;font-weight:700}
+  .tag.design{background:#4c1d95;color:#ddd6fe} .tag.mech{background:#0c4a6e;color:#bae6fd}
+  .tag.measure{background:#14532d;color:#bbf7d0} .tag.human{background:#78350f;color:#fde68a}
+  .tag.check{background:#134e4a;color:#99f6e4}
+  .badge-new{display:inline-block;font-size:9px;font-weight:800;letter-spacing:.5px;padding:1px 6px;border-radius:7px;background:var(--new);color:#fff}
+  .gate-b{display:inline-block;font-size:9px;padding:1px 6px;border-radius:7px;background:#14532d;color:#bbf7d0;font-weight:700}
+  /* filter bar */
+  .filterbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:14px 0;position:sticky;top:54px;background:#0f172af2;backdrop-filter:blur(4px);padding:8px 0;z-index:10}
+  .filterbar button{background:#1e293b;color:var(--muted);border:1px solid var(--line);padding:6px 12px;border-radius:18px;cursor:pointer;font-size:12px;font-family:inherit}
+  .filterbar button.active{color:#0b1224;background:var(--accent);border-color:var(--accent);font-weight:700}
+  .filterbar .sp{flex:1}
+  .filterbar .mini{font-size:11.5px;color:var(--muted)}
+  /* flow board */
+  .stage{background:var(--panel);border:1px solid var(--line);border-radius:11px;margin-bottom:12px;overflow:hidden}
+  .stage-head{display:flex;align-items:center;gap:12px;padding:13px 18px;cursor:pointer;user-select:none}
+  .stage-head:hover{background:var(--panel2)}
+  .stage-head .num{flex:0 0 26px;width:26px;height:26px;border-radius:50%;background:#0f1f3a;border:1.5px solid var(--accent);
+                   color:var(--accent);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .stage-head .nm{font-size:15px;font-weight:700;color:#f1f5f9}
+  .stage-head .meta{font-size:11.5px;color:var(--muted)}
+  .stage-head .chev{margin-left:auto;color:var(--muted);transition:transform .2s;font-size:13px}
+  .stage.open .chev{transform:rotate(90deg)}
+  .steps{display:none;padding:6px 18px 16px;border-top:1px solid var(--line)}
+  .stage.open .steps{display:block}
+  .step{display:flex;gap:11px;align-items:flex-start;padding:9px 0;border-bottom:1px dashed #2a3850;position:relative}
+  .step:last-child{border-bottom:none}
+  .step .ix{flex:0 0 22px;font-size:11px;color:#64748b;font-family:"SF Mono",monospace;padding-top:2px;text-align:right}
+  .step .bar{flex:0 0 4px;align-self:stretch;border-radius:3px;background:var(--mech)}
+  .step.t-design .bar{background:var(--design)} .step.t-mech .bar{background:var(--mech)}
+  .step.t-measure .bar{background:var(--measure)} .step.t-human .bar{background:var(--human)} .step.t-check .bar{background:var(--check)}
+  .step .body{flex:1;min-width:0}
+  .step .nm{font-family:"SF Mono",Consolas,monospace;font-size:12.5px;color:#f1f5f9;font-weight:600;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .step .nt{font-size:11.5px;color:var(--muted);margin-top:3px;overflow-wrap:anywhere}
+  .step .sk{color:#c4b5fd}
+  .step.dim{opacity:.2}
+  .step.t-human{background:#1c1407;border-radius:7px;padding:9px 9px;margin:3px 0;border-bottom:none}
+  .step.hot .nm{text-shadow:0 0 12px var(--human)}
+  /* before/after */
+  .ba{display:flex;flex-wrap:wrap;gap:16px;margin:16px 0}
+  .ba .col{flex:1 1 360px;border-radius:10px;padding:15px 18px;border:1px solid var(--line)}
+  .ba .bad{background:#1c0f14;border-color:#7f1d1d}
+  .ba .good{background:#0c1f16;border-color:#14532d}
+  .ba h4{margin:0 0 10px;font-size:14px}
+  .ba .bad h4{color:#fca5a5} .ba .good h4{color:#86efac}
+  .ba ul{margin:0;padding-left:18px;font-size:12.8px;color:#cbd5e1}
+  .ba li{margin:7px 0}
+  .ba code{font-size:11.5px}
+  /* loop diagram */
+  .loop{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:18px 0;justify-content:center}
+  .lb{background:#0b1224;border:1.5px solid var(--line);border-radius:9px;padding:11px 15px;font-size:12.5px;text-align:center;min-width:120px}
+  .lb b{display:block;font-size:13px;color:var(--accent);font-family:"SF Mono",monospace}
+  .lb.stop{border-color:var(--human);background:#1c1407} .lb.stop b{color:var(--human)}
+  .lb.done{border-color:var(--measure);background:#0c1f16} .lb.done b{color:var(--measure)}
+  .arr{color:#475569;font-size:18px}
+  /* driver sim */
+  .sim{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:16px 18px;margin:16px 0}
+  .track{display:flex;flex-wrap:wrap;gap:5px;margin:14px 0}
+  .tk{width:15px;height:15px;border-radius:4px;background:#334155;cursor:pointer;position:relative;transition:transform .12s}
+  .tk.t-design{background:var(--design)} .tk.t-mech{background:var(--mech)}
+  .tk.t-measure{background:var(--measure)} .tk.t-human{background:var(--human);border:2px solid #fff}
+  .tk.t-check{background:var(--check)}
+  .tk.cur{transform:scale(1.55);box-shadow:0 0 10px #fff;z-index:2}
+  .tk.passed{opacity:.32}
+  .simctl{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .simctl button{background:var(--accent);color:#06283d;border:none;padding:8px 16px;border-radius:7px;cursor:pointer;font-weight:700;font-size:13px;font-family:inherit}
+  .simctl button.ghost{background:#1e293b;color:var(--muted);border:1px solid var(--line)}
+  .simctl button:disabled{opacity:.4;cursor:not-allowed}
+  .simstat{font-size:13px;font-family:"SF Mono",monospace;color:#cbd5e1;min-height:20px}
+  .simstat .hl{color:var(--human);font-weight:700}
+  .simstat .ok{color:var(--measure);font-weight:700}
+  .note{font-size:12px;color:var(--muted);border-left:3px solid var(--accent);padding-left:11px;margin:12px 0}
+  .kv{font-size:12.5px} .kv b{color:var(--accent2)}
+  table{width:100%;border-collapse:collapse;margin:10px 0 18px;font-size:12.8px}
+  th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  th{background:#0b1224;color:var(--accent2)}
+</style>
+</head>
+<body>
+<header>
+  <h1>改造后完整流程 · 交互手册<span class="ver">v0.4.0 · M11</span></h1>
+  <p>芯片后端物理实现流程（<b>9 stage / 48 step / 8 gate / 9 人工门</b>）。本次改造修复了 <b>problem 1</b>（主 agent 自写驱动脚本一把梭），并在 6 个 key/timing stage 加了人工确认门。点 tab 切换视图；「完整流程」里点 stage 展开步骤，用顶部按钮筛选；「Driver Loop」里点 <b>▶ 模拟驱动</b> 看 agent 如何逐步推进并在人工门停下。</p>
+</header>
+
+<nav class="tabs">
+  <button class="active" data-t="ov">① 概览</button>
+  <button data-t="flow">② 完整流程（48 步）</button>
+  <button data-t="loop">③ Driver Loop · problem 1 修复</button>
+  <button data-t="resume">④ 可恢复性 · 每步落盘</button>
+</nav>
+
+<main>
+  <!-- ===================== 概览 ===================== -->
+  <section id="ov" class="active">
+    <h2>一图看懂改造后的系统</h2>
+    <div class="cards">
+      <div class="card"><div class="n">9</div><div class="l">Stage 阶段</div></div>
+      <div class="card"><div class="n">48</div><div class="l">Step 步骤<br><span style="color:#64748b">(原 42 +6)</span></div></div>
+      <div class="card g"><div class="n">8</div><div class="l">质量 Gate<br><span style="color:#64748b">parse-eda-report</span></div></div>
+      <div class="card h"><div class="n">9</div><div class="l">人工门<br><span style="color:#64748b">(原 3 +6)</span></div></div>
+      <div class="card d"><div class="n">11</div><div class="l">AI 决策步<br><span style="color:#64748b">playbook skill</span></div></div>
+    </div>
+
+    <div class="lead">
+      <b>两层驱动架构（没变，但是理解一切的前提）</b> — 上层是<b>元状态机</b>（<code>state_manager.py</code>），管生命周期：<code>INIT → SPEC_DRAFTING → SPEC_REVIEW → SCHEDULING ⇄ STAGE_RUNNING → COMPLETED</code>。下层是<b>步级流程引擎</b>（<code>flow_loader.py</code> + <code>flow_definition.yaml</code>），只在 <code>STAGE_RUNNING</code> 内部驱动「下一步跑什么、用哪个执行者、读写哪些文件」。<b>本次改造只动了下层（加人工门）+ SKILL.md（驱动护栏），状态机一行没改。</b>
+    </div>
+
+    <h3>节点四分类（决定每一步怎么执行）</h3>
+    <div class="legend">
+      <span><i class="dot check"></i> version-check · 确定性校验（首步）</span>
+      <span><i class="dot design"></i> AI 决策 · 主 agent 跑 playbook → decisions.yaml</span>
+      <span><i class="dot mech"></i> 自动执行 · render-tcl → run-eda-script</span>
+      <span><i class="dot measure"></i> 自动校验 · parse-eda-report（gate）→ eval_result.yaml</span>
+      <span><i class="dot human"></i> 人工确认 · 流程暂停等 resolve-human</span>
+    </div>
+
+    <h3>本次改了什么（problem 1 + 你的两个约束）</h3>
+    <table>
+      <tr><th>改动</th><th>文件</th><th>作用</th></tr>
+      <tr><td>禁止 agent 自写驱动脚本 + 「你就是 driver loop」+ 每步落盘纪律 + await_human 无条件停 + Anti-patterns + 跨 stage 检查点</td><td><code>run-chip-flow/SKILL.md</code></td><td>修复 problem 1 的<b>核心护栏</b></td></tr>
+      <tr><td>6 个 key/timing stage 各加 <code>confirm_&lt;stage&gt;_result</code> 人工门（floorplan/powerplan/placement/cts/route/timing_eco）</td><td><code>flow_definition.yaml</code></td><td>约束①：关键/时序阶段人工确认 · 42→48 步</td></tr>
+      <tr><td>步数 + 人工门集合改为从 flow_def <b>推导</b>（不再写死 42/3）</td><td><code>run_e2e.py</code></td><td>测试自适应新步数</td></tr>
+      <tr><td>0.3.3 → 0.4.0；CLAUDE.md / flow_impl_progress.md(M11) 同步</td><td><code>plugin.json</code> 等</td><td>版本与文档</td></tr>
+    </table>
+    <p class="note">约束②（每步落盘、可换会话续跑）已是引擎的固有能力（磁盘对账续跑）；本次把 agent「每步先落盘再 mark」的纪律变成<b>强制</b>。已实证：全新进程只调 <code>flow_loader next</code> 即凭磁盘幂等返回 <code>flow_complete</code>。</p>
+  </section>
+
+  <!-- ===================== 完整流程 ===================== -->
+  <section id="flow">
+    <h2>完整流程 · 9 stage × 48 step</h2>
+    <div class="filterbar">
+      <button class="active" data-f="all">全部</button>
+      <button data-f="human">仅人工门 (9)</button>
+      <button data-f="design">仅 AI 决策 (11)</button>
+      <button data-f="measure">仅 Gate (8)</button>
+      <span class="sp"></span>
+      <span class="mini" id="cnt"></span>
+      <button class="ghost" id="toggleAll" style="border-radius:6px">展开全部</button>
+    </div>
+    <div id="board"></div>
+  </section>
+
+  <!-- ===================== Driver Loop ===================== -->
+  <section id="loop">
+    <h2>Driver Loop · problem 1 是怎么修的</h2>
+    <p><b>problem 1</b>：主 agent 跑 run-chip-flow 时，把驱动循环翻译成 <code>_orchestrate.py</code> / <code>_drive_flow.py</code> 两个脚本一把梭，5 个 stage 在 ~20 秒内无停顿冲过，绕过了人工门和逐步判断。根因：SKILL.md 把循环写成伪代码，且<b>从没禁止 agent 自写驱动脚本</b>。</p>
+
+    <div class="ba">
+      <div class="col bad">
+        <h4>❌ 改造前（被 agent 钻的空子）</h4>
+        <ul>
+          <li>SKILL.md：「repeat until flow_complete … act on it, then loop」——读起来就是伪代码</li>
+          <li>没有一条规则说「不许把 loop 写成脚本」</li>
+          <li>agent 写 <code>_orchestrate.py</code>（外层 stage 循环）+ <code>_drive_flow.py</code>（内层 step 循环）</li>
+          <li>脚本只在 await_human/flow_complete/gate-fail 停 → floorplan 之后无人工门 → 一路冲到 signoff</li>
+          <li>决策步只跑 <code>gen_decisions.py</code> baseline → <b>零 playbook 判断</b></li>
+        </ul>
+      </div>
+      <div class="col good">
+        <h4>✅ 改造后（SKILL.md 护栏）</h4>
+        <ul>
+          <li><b>「你就是 driver loop」</b>：一次 <code>next</code> → 一个 action → 一个 <code>mark</code>，绝不批处理</li>
+          <li><b>禁止</b>写任何 <code>_orchestrate.py</code>/<code>_drive_flow.py</code>/bash while 等驱动脚本</li>
+          <li><code>await_human</code> 是<b>无条件停</b>、不可脚本化；没真人确认不得 <code>resolve-human</code></li>
+          <li><b>每步先落盘再 mark</b>（不靠上下文记忆推进）</li>
+          <li>决策步必须读 SKILL.md playbook + 本芯片 spec/上游 eval 推理，baseline 只是兜底</li>
+          <li>Phase D <b>跨 stage 检查点</b>：每个 gate 后向用户汇报再继续，正确性不依赖恰好有人工门</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>正确的驱动循环（你 = 循环本身，一次一步）</h3>
+    <div class="loop">
+      <div class="lb"><b>next</b>flow_loader 算下一步</div>
+      <div class="arr">→</div>
+      <div class="lb"><b>action?</b>run / await_human<br>/ flow_complete</div>
+      <div class="arr">→</div>
+      <div class="lb"><b>dispatch</b>按 executor.type<br>跑这一步</div>
+      <div class="arr">→</div>
+      <div class="lb"><b>落盘+mark</b>产出写磁盘<br>→ mark done</div>
+      <div class="arr">↺</div>
+      <div class="lb stop"><b>await_human</b>停！等真人<br>→ resolve-human</div>
+      <div class="arr">→</div>
+      <div class="lb done"><b>flow_complete</b>全部 done</div>
+    </div>
+
+    <h3>▶ 模拟：agent 如何逐步推进并在人工门停下</h3>
+    <div class="sim">
+      <div class="track" id="track"></div>
+      <div class="simctl">
+        <button id="play">▶ 模拟驱动</button>
+        <button id="confirm" class="ghost" disabled>✓ 人工确认，继续</button>
+        <button id="reset" class="ghost">↺ 重置</button>
+        <span class="simstat" id="simstat">点「模拟驱动」——agent 会一步步走，碰到人工门（白边方块）就停下等你确认。</span>
+      </div>
+      <p class="note">这正是改造后的行为：每个方块 = 一步，agent 一次只推进一步；遇到 9 个人工门（含 6 个新增）必须停下等真人 <code>resolve-human</code>。改造前那个脚本会无视白边方块一路冲到底。</p>
+    </div>
+  </section>
+
+  <!-- ===================== 可恢复性 ===================== -->
+  <section id="resume">
+    <h2>可恢复性 · 每一次输出都落盘</h2>
+    <div class="lead"><b>为什么能「合上电脑、换个新会话从原地继续」</b> — <code>flow_loader.next</code> 跨进程<b>无状态</b>：每次调用都重读 <code>state/flow_progress.yaml</code> + 磁盘，做<b>磁盘对账</b>——某步 <code>required: true</code> 的 output 全部存在 → 自动标 <code>done</code>。所以新会话只要再调 <code>next</code> 就从下一个待办步续上，无需内存、无需重放。</div>
+
+    <h3>每步要落什么盘（改造后强制）</h3>
+    <table>
+      <tr><th>步骤类型</th><th>必须落盘的产物</th><th>清除方式</th></tr>
+      <tr><td><span class="tag design">AI 决策</span></td><td><code>decisions.yaml</code> + 渲染出的 <code>step.tcl</code> + 报告/工件</td><td>output 齐 → mark done</td></tr>
+      <tr><td><span class="tag mech">自动执行</span></td><td>声明的 output（DEF / .rpt / 工件）</td><td>output 齐 → 自动 done</td></tr>
+      <tr><td><span class="tag measure">Gate</span></td><td><code>eval_result.yaml</code></td><td>output 齐 → 自动 done</td></tr>
+      <tr><td><span class="tag human">人工门</span></td><td><b>无 output</b> → 永远停在 await_human</td><td>只能由 <code>resolve-human</code> 清除</td></tr>
+    </table>
+    <p class="note">关键洞察：人工门<b>故意不声明 output</b>，所以磁盘对账永远不会把它自动标 done——它会一直停在 <code>await_human</code>，直到真人确认。这就是「持久暂停」：你可以在任何一个人工门处离开，下次新会话精确地停在那一步。</p>
+
+    <h3>实测证据（~/chip-demo 严格重跑）</h3>
+    <div class="kv">
+      <p>✓ 移除两个 improvised 脚本 + 清旧快照/进度/产物 → 用新 48 步重新 snapshot → 干净重跑：<br>
+      <b>48/48 done · 8/8 gate PASS · 9/9 人工门 resolve · chip.gds 产出 · flow_complete</b></p>
+      <p>✓ 约束②证明：全新进程仅调 <code>flow_loader next</code> → 凭磁盘<b>幂等</b>返回 <code>flow_complete</code>。</p>
+    </div>
+    <p class="note">注意：本次的 e2e 验证的是 <b>flow_loader 层</b>（与项目自带 <code>run_e2e.py</code> 同语义）。「agent 是否真的不再自写脚本」属于 SKILL.md 护栏层，run_e2e 不覆盖——要彻底回归需用 sub-agent 按 SKILL.md 真驱动一遍。</p>
+  </section>
+</main>
+
+<script>
+// ---------- flow data (源自 templates/flow_definition.yaml) ----------
+const T = {design:'AI 决策',mech:'自动执行',measure:'Gate 校验',human:'人工确认',check:'版本校验'};
+const STAGES = [
+ {id:'import',nm:'Design Import / 数据准备',steps:[
+   {id:'version_check',t:'check',nt:'确定性校验 netlist·SDC·lib·PDK 同 release（首步，不调 EDA）'},
+   {id:'read_design',t:'mech',nt:'读网表 / 物理库 / 时序库 / RC tech → imported.db'},
+   {id:'setup_mmmc',t:'mech',nt:'配置 MMMC + 加载 SDC → mmmc.db'},
+   {id:'global_net_connect',t:'mech',nt:'globalNetConnect（PG 逻辑连接）+ tie/physical-only'},
+   {id:'check_design',t:'mech',nt:'check_design / check_timing -unconstrained → check_design.rpt'},
+   {id:'import_eval',t:'measure',nt:'导入质量 gate → eval_result.yaml'},
+ ]},
+ {id:'floorplan',nm:'Floorplan / 布局规划',steps:[
+   {id:'gen_floorplan',t:'design',sk:'floorplan-plan',nt:'定义 die/core 尺寸·形状·aspect ratio'},
+   {id:'place_io_pins',t:'design',sk:'floorplan-io-pins',nt:'摆 IO pin（block）/ pad ring（top）'},
+   {id:'macro_placement',t:'design',sk:'floorplan-macro',nt:'Macro 摆放（数据流·朝向·channel）'},
+   {id:'confirm_macro',t:'human',nt:'人工确认 macro / pin 摆放（GUI 视觉确认，pre-metrics）'},
+   {id:'add_blockage',t:'design',sk:'floorplan-macro',nt:'加 halo / blockage / voltage area → floorplan.def'},
+   {id:'floorplan_eval',t:'measure',nt:'Floorplan gate（utilization / channel）'},
+   {id:'confirm_floorplan_result',t:'human',new:1,nt:'人工确认 floorplan 指标（利用率 / channel / 时序裕量）再进 powerplan'},
+ ]},
+ {id:'powerplan',nm:'Power Planning / 电源规划',steps:[
+   {id:'gen_power_plan',t:'design',sk:'powerplan-design',nt:'生成电源环 / 条带 / sroute 脚本'},
+   {id:'run_power_plan',t:'mech',nt:'执行 PG（addRing / addStripe / sroute / follow-pin）'},
+   {id:'insert_tap_decap',t:'mech',nt:'插 tap / endcap / decap / power switch'},
+   {id:'early_ir',t:'mech',nt:'早期 IR-drop / EM 评估 → ir.rpt'},
+   {id:'power_eval',t:'measure',nt:'电源网络 gate（IR drop / 连通性）'},
+   {id:'confirm_powerplan_result',t:'human',new:1,nt:'人工确认电源规划（IR drop / 连通性 / EM 余量）再进 placement'},
+ ]},
+ {id:'placement',nm:'Placement / 标准单元布局',steps:[
+   {id:'place_opt',t:'design',sk:'placement-design',nt:'标准单元布局 + 优化（含 tie cell / HFNS）'},
+   {id:'scan_reorder',t:'mech',nt:'Scan chain reorder'},
+   {id:'congestion_analysis',t:'mech',nt:'Congestion 分析（trial route）→ congestion.rpt'},
+   {id:'placement_eval',t:'measure',nt:'Placement gate（congestion / pre-CTS timing）'},
+   {id:'confirm_placement_result',t:'human',new:1,nt:'人工确认布局（congestion / pre-CTS 时序）再进 CTS'},
+ ]},
+ {id:'cts',nm:'CTS / 时钟树综合',steps:[
+   {id:'gen_cts_spec',t:'design',sk:'cts-design',nt:'配置 CTS spec（target skew / NDR / leaf cell / skew group）'},
+   {id:'build_clock_tree',t:'mech',nt:'时钟树构建 + skew 平衡 + clock 布线'},
+   {id:'postcts_opt',t:'mech',nt:'Post-CTS 优化（hold/setup + DRV）→ clock_tree.rpt'},
+   {id:'cts_eval',t:'measure',nt:'CTS gate（skew / insertion delay / timing）'},
+   {id:'confirm_cts_result',t:'human',new:1,nt:'人工确认时钟树（skew / insertion delay / 时序）再进 route'},
+ ]},
+ {id:'route',nm:'Routing / 布线',steps:[
+   {id:'global_route',t:'design',sk:'route-strategy',nt:'全局布线 + track assignment（NDR / shielding）'},
+   {id:'detail_route',t:'design',sk:'route-strategy',nt:'详细布线（NanoRoute）+ post-route 优化'},
+   {id:'drc_repair',t:'design',sk:'route-drc-repair',nt:'DRC / antenna 修复（search & repair / 冗余 via）→ drc.rpt'},
+   {id:'route_eval',t:'measure',nt:'Route gate（DRC / open / timing）'},
+   {id:'confirm_route_result',t:'human',new:1,nt:'人工确认布线（DRC / open / 时序）再进 timing ECO'},
+ ]},
+ {id:'timing_eco',nm:'Timing Closure / 时序收敛 · ECO',steps:[
+   {id:'extract_rc',t:'mech',nt:'RC 抽取 → 生成 SPEF'},
+   {id:'signoff_sta',t:'mech',nt:'Signoff STA（全 corner/mode，含 SI）→ timing.rpt'},
+   {id:'fix_strategy',t:'design',sk:'timing-eco-design',nt:'制定 setup/hold/功耗 ECO 修复策略 → eco.changes'},
+   {id:'apply_eco',t:'mech',nt:'应用 ECO（ecoPlace / ecoRoute）→ eco_timing.rpt'},
+   {id:'timing_eval',t:'measure',nt:'时序收敛 gate（WNS / TNS / hold 全 view）'},
+   {id:'confirm_timing_result',t:'human',new:1,nt:'人工确认时序收敛（WNS / TNS / hold）再进 signoff'},
+ ]},
+ {id:'signoff',nm:'Signoff / 物理验证',steps:[
+   {id:'metal_fill',t:'mech',nt:'Metal fill / dummy fill（density）'},
+   {id:'signoff_drc_lvs',t:'mech',nt:'Signoff DRC + LVS + antenna/ERC → drc_lvs.rpt'},
+   {id:'signoff_ir_em',t:'mech',nt:'Signoff IR-drop（static+dynamic）+ EM → ir_em.rpt'},
+   {id:'waiver_review',t:'human',nt:'人工 review 残余 violation 并逐项判定 waiver'},
+   {id:'signoff_eval',t:'measure',nt:'Signoff gate（DRC/LVS clean / IR/EM 达标）'},
+ ]},
+ {id:'tapeout',nm:'Tapeout / GDS 交付',steps:[
+   {id:'chip_finishing',t:'mech',nt:'filler / seal ring / scribe line / dummy 收尾'},
+   {id:'streamout',t:'mech',nt:'输出 GDSII（streamOut）+ GDS merge → chip.gds'},
+   {id:'final_checklist',t:'human',nt:'人工 tapeout checklist 终审 → flow_complete'},
+ ]},
+];
+
+// ---------- render board ----------
+const board=document.getElementById('board');
+let gi=0;
+STAGES.forEach((st,si)=>{
+  const stepsHtml=st.steps.map(s=>{
+    gi++;
+    const tags=[`<span class="tag ${s.t}">${T[s.t]}</span>`];
+    if(s.t==='measure')tags.push('<span class="gate-b">GATE</span>');
+    if(s.new)tags.push('<span class="badge-new">NEW</span>');
+    const sk=s.sk?` <span class="sk">[${s.sk}]</span>`:'';
+    return `<div class="step t-${s.t}" data-t="${s.t}">
+      <div class="ix">${gi}</div><div class="bar"></div>
+      <div class="body"><div class="nm">${s.id}${sk} ${tags.join(' ')}</div>
+      <div class="nt">${s.nt}</div></div></div>`;
+  }).join('');
+  const human=st.steps.filter(s=>s.t==='human').length;
+  const gate=st.steps.filter(s=>s.t==='measure').length;
+  const dec=st.steps.filter(s=>s.t==='design').length;
+  const meta=[`${st.steps.length} 步`];
+  if(dec)meta.push(`${dec} 决策`); if(gate)meta.push(`${gate} gate`); if(human)meta.push(`<span style="color:var(--human)">${human} 人工门</span>`);
+  const div=document.createElement('div');
+  div.className='stage'+(si===1?' open':'');
+  div.innerHTML=`<div class="stage-head"><div class="num">${si}</div>
+    <div><div class="nm">${st.nm}</div><div class="meta">${meta.join(' · ')}</div></div>
+    <div class="chev">▶</div></div><div class="steps">${stepsHtml}</div>`;
+  div.querySelector('.stage-head').addEventListener('click',()=>div.classList.toggle('open'));
+  board.appendChild(div);
+});
+document.getElementById('cnt').textContent='共 48 步 · 11 决策 · 8 gate · 9 人工门';
+
+// ---------- filters ----------
+document.querySelectorAll('.filterbar [data-f]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.filterbar [data-f]').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');
+  const f=b.dataset.f;
+  if(f!=='all')document.querySelectorAll('.stage').forEach(s=>s.classList.add('open'));
+  document.querySelectorAll('.step').forEach(st=>{
+    st.classList.toggle('dim', f!=='all' && st.dataset.t!==f);
+  });
+}));
+
+// ---------- expand/collapse all ----------
+const tA=document.getElementById('toggleAll');
+tA.addEventListener('click',()=>{
+  const open=tA.textContent.includes('展开');
+  document.querySelectorAll('.stage').forEach(s=>s.classList.toggle('open',open));
+  tA.textContent=open?'收起全部':'展开全部';
+});
+
+// ---------- tabs ----------
+document.querySelectorAll('nav.tabs button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('nav.tabs button').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('main section').forEach(s=>s.classList.remove('active'));
+  b.classList.add('active');
+  document.getElementById(b.dataset.t).classList.add('active');
+}));
+
+// ---------- driver simulation ----------
+const FLAT=[]; STAGES.forEach(st=>st.steps.forEach(s=>FLAT.push(s)));
+const track=document.getElementById('track');
+FLAT.forEach((s,i)=>{
+  const d=document.createElement('div');
+  d.className='tk t-'+s.t; d.title=s.id+(s.t==='human'?'（人工门 · 停）':'');
+  track.appendChild(d);
+});
+const tks=[...track.children];
+const stat=document.getElementById('simstat');
+const playBtn=document.getElementById('play'), confirmBtn=document.getElementById('confirm'), resetBtn=document.getElementById('reset');
+let pos=-1, timer=null, waiting=false;
+
+function paint(){tks.forEach((t,i)=>{t.classList.toggle('cur',i===pos);t.classList.toggle('passed',i<pos);});}
+function reset(){clearInterval(timer);timer=null;waiting=false;pos=-1;paint();
+  playBtn.disabled=false;confirmBtn.disabled=true;
+  stat.textContent='点「模拟驱动」——agent 会一步步走，碰到人工门（白边方块）就停下等你确认。';}
+function step(){
+  pos++;
+  if(pos>=FLAT.length){clearInterval(timer);timer=null;paint();
+    stat.innerHTML='<span class="ok">flow_complete</span> — 48/48 步 done，8 gate PASS，9 人工门已确认。';
+    playBtn.disabled=true;confirmBtn.disabled=true;return;}
+  paint();
+  const s=FLAT[pos];
+  if(s.t==='human'){
+    clearInterval(timer);timer=null;waiting=true;
+    confirmBtn.disabled=false;playBtn.disabled=true;
+    stat.innerHTML=`第 ${pos+1} 步 <span class="hl">await_human：${s.id}</span> — 流程<span class="hl">停下</span>，等真人 resolve-human。点「✓ 人工确认，继续」。`;
+  }else{
+    stat.innerHTML=`第 ${pos+1} 步 run：<b>${s.id}</b>（${T[s.t]}）→ 落盘 + mark done`;
+  }
+}
+function run(){playBtn.disabled=true;confirmBtn.disabled=true;
+  timer=setInterval(step,520);}
+playBtn.addEventListener('click',()=>{if(pos>=FLAT.length-1||pos<0&&!timer){if(pos>=FLAT.length-1)reset();}run();});
+confirmBtn.addEventListener('click',()=>{if(!waiting)return;waiting=false;confirmBtn.disabled=true;
+  stat.innerHTML=`✓ 已 resolve-human：<b>${FLAT[pos].id}</b> — 继续驱动…`;
+  setTimeout(run,400);});
+resetBtn.addEventListener('click',reset);
+</script>
+</body>
+</html>

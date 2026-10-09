@@ -1,0 +1,82 @@
+[
+  {
+    "query": "ChipA 那份后端实现报告 v3 里 floorplan 写的 die 是 4×4 mm 没记错吧？PLL_top 我记得是放西北角，能帮我从原文里把这两条引出来吗",
+    "should_trigger": true
+  },
+  {
+    "query": "我刚把 raw/ChipB_signoff_v2.docx 扔进来，需要 ingest 进 wiki，按你那套 7 步流程走，先帮我 parse 然后写 doc_006 的 source 页",
+    "should_trigger": true
+  },
+  {
+    "query": "wiki/ 里好像有几条 stale_citation，跑一下 lint 看看 source_sha 哪份对不上 parsed 里的 sha",
+    "should_trigger": true
+  },
+  {
+    "query": "post-CTS 的 71ps skew 我记得是从某份评审 PPT 里看到的，目标好像是 80ps，给我找到原文那一页，PPT 名字里应该有 2026-04",
+    "should_trigger": true
+  },
+  {
+    "query": "wiki 索引里 ChipA_v3 这个项目目前挂了几份源文档，每份大概是什么阶段（floorplan / cts / review 之类的）",
+    "should_trigger": true
+  },
+  {
+    "query": "我们换了个项目，也是按 raw → parsed → wiki/sources/projects/entities 这套 Karpathy llm-wiki 的搞法搭知识库，能帮我在新 repo 里 bootstrap 一遍，把 raw/ 目录里的第一份 word 跑起来吗",
+    "should_trigger": true
+  },
+  {
+    "query": "doc_004 那份 ChipB Power Plan 笔记里 PG 网络用的 M9/M10，spacing 写的多少来着，EM 仿真余量 12% 那个是不是同一份文档",
+    "should_trigger": true
+  },
+  {
+    "query": "raw/ChipC_概念笔记.docx 这份只是早期速记没有 heading 层级，按你解析器的兜底逻辑应该整篇就是一个 section 吧？先 parse 一下我看看切片长啥样",
+    "should_trigger": true
+  },
+  {
+    "query": "刚才回答你的问题时我在 sources/doc_002__ChipA_后端实现报告_v3.md 又补了 2 条 CTS 决策（buffer 1242 + 调整后的 corner），这种新事实是不是要回填到 projects/ChipA_v3.md 的关键决策段",
+    "should_trigger": true
+  },
+  {
+    "query": "ChipA_PPA_汇总.xlsx 里 Power sheet 三块（PLL_top + clock_mesh + core_logic）的动态功耗加起来是多少，对应的 cite 放在 wiki 哪个页面比较合适",
+    "should_trigger": true
+  },
+  {
+    "query": "解释一下 hold slack 和 setup slack 的区别，特别是为什么 hold violation 通常更难修",
+    "should_trigger": false
+  },
+  {
+    "query": "我准备在 innovus 里跑 cts 阶段，5nm 工艺，spec 已经准备好了，启动 backend flow",
+    "should_trigger": false
+  },
+  {
+    "query": "innovus 里 create_clock_tree_spec 这个命令的完整 syntax 和常用 option 给我查一下",
+    "should_trigger": false
+  },
+  {
+    "query": "客户给了一份 N5 datasheet PDF（大概 200 多页），帮我转成 markdown 存到 knowledge/processed_eda/ 下，可能涉及一些表格和字体识别",
+    "should_trigger": false
+  },
+  {
+    "query": "列一下你这边 expert_base 里目前有哪些 topic，特别是 floorplan 相关的我想先看一下",
+    "should_trigger": false
+  },
+  {
+    "query": "把 example_lab_doc.md 里 Module 3 的 dbGet basics 那一节给我读出来，我跟着练一下",
+    "should_trigger": false
+  },
+  {
+    "query": "我用 python-docx 自己解析一份 word，遇到表格里有合并单元格，cell.text 拿到的是重复内容怎么处理才优雅",
+    "should_trigger": false
+  },
+  {
+    "query": "markdown 里的 reference-style 链接（就是 [label] 在正文，[label]: url 在文末那种）和 inline link 比起来什么时候该用哪个",
+    "should_trigger": false
+  },
+  {
+    "query": "我刚做完一个 commit 想加 co-author 标记给同事，git commit 的 message 里那行 Co-Authored-By 写法是不是只能用 noreply 邮箱",
+    "should_trigger": false
+  },
+  {
+    "query": "我在写一个 Claude Code plugin，SKILL.md frontmatter 里 description 怎么写才容易让 Claude 触发，有没有最佳实践",
+    "should_trigger": false
+  }
+]

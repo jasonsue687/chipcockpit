@@ -1,0 +1,38 @@
+{
+  "description": "Synchronize visible Claude Code conversation text into the active chip-flow workspace.",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/core/workflow/session_sync.py\" hook",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/core/workflow/session_sync.py\" hook",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/core/workflow/session_sync.py\" hook",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

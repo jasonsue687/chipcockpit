@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>芯片后端 + AI · LLM-Agent 流派与实现原理速览</title>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#1e293b; --panel2:#273449; --line:#334155;
+    --text:#e2e8f0; --muted:#94a3b8; --accent:#38bdf8; --accent2:#22d3ee;
+    --r1:#a78bfa; --r2:#f472b6; --r3:#22c55e; --r4:#38bdf8; --r5:#f59e0b;
+    --warn:#fb7185; --ok:#34d399;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"Segoe UI",Helvetica,"PingFang SC","Microsoft YaHei",sans-serif;
+       background:var(--bg);color:var(--text);line-height:1.55;font-size:14px}
+  header{padding:24px 40px;background:linear-gradient(135deg,#0b1224 0%,#172554 100%);border-bottom:1px solid var(--line)}
+  header h1{margin:0;font-size:22px}
+  header p{margin:7px 0 0;color:var(--muted);font-size:13px;max-width:1180px}
+  header p b{color:var(--accent)}
+  nav.tabs{display:flex;flex-wrap:wrap;gap:6px;padding:12px 40px;background:#0b1224;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+  nav.tabs button{background:transparent;color:var(--muted);border:1px solid transparent;padding:7px 13px;border-radius:6px;cursor:pointer;font-size:13px;font-family:inherit}
+  nav.tabs button:hover{color:var(--text);background:#1e293b}
+  nav.tabs button.active{color:var(--accent);background:#0f1f3a;border-color:var(--accent)}
+  main{padding:24px 40px;max-width:1280px}
+  section{display:none;animation:fade .22s ease}
+  section.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  h2{font-size:19px;border-left:4px solid var(--accent);padding-left:12px;margin:4px 0 14px}
+  h3{font-size:15px;color:var(--accent2);margin:26px 0 8px}
+  p{color:#cbd5e1;margin:8px 0}
+  code{font-family:"SF Mono",Consolas,monospace;color:#fbbf24;font-size:12px;background:#0b1224;padding:1px 5px;border-radius:4px}
+  a{color:var(--accent)}
+  table{width:100%;border-collapse:collapse;margin:8px 0 20px;font-size:12.5px}
+  th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  th{background:#0b1224;color:var(--accent2);font-weight:600;position:sticky}
+  tr:hover td{background:#1a2540}
+  .lead{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin:14px 0}
+  .lead b{color:var(--accent)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  @media(max-width:900px){.grid2,.grid3{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  .card.r1{border-top:3px solid var(--r1)} .card.r2{border-top:3px solid var(--r2)}
+  .card.r3{border-top:3px solid var(--r3)} .card.r4{border-top:3px solid var(--r4)}
+  .card.r5{border-top:3px solid var(--r5)}
+  .card h4{margin:0 0 8px;font-size:15px}
+  .card .meta{font-size:11.5px;color:var(--muted);margin:-4px 0 10px}
+  .card ul{margin:6px 0;padding-left:18px} .card li{margin:3px 0;font-size:12.5px;color:#cbd5e1}
+  .kv{font-size:12.5px;margin:5px 0} .kv b{color:var(--accent2)}
+  .tag{display:inline-block;font-size:10px;padding:1px 7px;border-radius:8px;font-weight:700;letter-spacing:.3px}
+  .tag.r1{background:#4c1d95;color:#ddd6fe} .tag.r2{background:#831843;color:#fbcfe8}
+  .tag.r3{background:#14532d;color:#bbf7d0} .tag.r4{background:#0c4a6e;color:#bae6fd}
+  .tag.r5{background:#78350f;color:#fde68a}
+  .num{color:var(--ok);font-weight:700}
+  .bad{color:var(--warn);font-weight:600}
+  .pill{display:inline-block;font-size:10px;padding:1px 7px;border-radius:7px;font-weight:600}
+  .pill.built{background:#14532d;color:#bbf7d0} .pill.todo{background:#7c2d12;color:#fed7aa}
+  .pill.shared{background:#0c4a6e;color:#bae6fd}
+  .ladder{display:flex;flex-direction:column;gap:6px;margin:10px 0}
+  .rung{display:grid;grid-template-columns:64px 1fr;gap:12px;align-items:center;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;padding:9px 14px}
+  .rung .lv{font-size:18px;font-weight:800;color:var(--accent);text-align:center}
+  .rung small{color:var(--muted)}
+  .rung.here{border-left-color:var(--r3);background:#10241a}
+  .rung.here .lv{color:var(--r3)}
+  .flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#0b1224;border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:10px 0;font-size:12.5px}
+  .flow .step{background:#172554;border:1px solid var(--accent);border-radius:7px;padding:6px 10px;color:#dbeafe}
+  .flow .arrow{color:var(--accent2);font-weight:700}
+  .note{font-size:12px;color:var(--muted);border-left:3px solid var(--line);padding-left:12px;margin:10px 0}
+  .hl{background:#10241a;border:1px solid #14532d;border-radius:8px;padding:12px 16px;margin:14px 0}
+  .hl b{color:var(--ok)}
+  .src{font-size:12.5px} .src li{margin:4px 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>芯片后端 + AI · LLM-Agent 流派与实现原理速览</h1>
+  <p>把"业界/学术上现成的 AI 后端流"拆成 <b>5 种实现范式</b>，逐个讲清 <b>怎么做 / 怎么实现 / 原理是什么 / 真实数字</b>，并对照 <b>chip-backend-ai 仓库</b>给出可借鉴点。截至 2026-06。点页签切换。</p>
+</header>
+
+<nav class="tabs">
+  <button class="active" data-t="ov">① 总览 · 两条路线</button>
+  <button data-t="para">② 五大范式</button>
+  <button data-t="impl">③ 实现机制对照</button>
+  <button data-t="principle">④ 六条底层原理</button>
+  <button data-t="mine">⑤ 对照你的仓库</button>
+  <button data-t="src">⑥ 资料源</button>
+</nav>
+
+<main>
+
+<!-- ============ 总览 ============ -->
+<section class="active" id="ov">
+  <h2>总览：芯片后端 + AI 其实是两条不同的技术路线</h2>
+  <div class="lead">
+    别把它们混为一谈——一条是<b>把 RL/ML 当 PPA 优化引擎</b>（商业 EDA 内置），另一条是<b>把 LLM 当会用工具的 agent</b>（开源/学术）。
+    本文档重点拆第二条（和你的仓库同构），第一条作为坐标。<br>
+    <span class="bad">⚠ 关键认知：</span>到目前为止真正在工业级流片里被验证的是 <b>RL（AlphaChip）</b>，<b>还没有任何 LLM-agent 做到 human-free 流片</b>（sim-to-silicon gap）。
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h4>A · RL / ML = PPA 优化引擎</h4>
+      <p class="meta">不写脚本、不读 log，在参数/设计空间里做强化学习搜索，直接顶 PPA</p>
+      <table>
+        <tr><th>方案</th><th>干什么</th><th>公开战绩</th></tr>
+        <tr><td><b>Synopsys DSO.ai</b></td><td>synth+P&R 全流程自治 DSE</td><td>5nm 周期 6 月→6 周(<span class="num">-75%</span>)，PPA <span class="num">+20%</span></td></tr>
+        <tr><td><b>Cadence Cerebrus</b></td><td>RTL-to-signoff ML 调参</td><td>生产力 <span class="num">10×</span>、PPA <span class="num">+20%</span></td></tr>
+        <tr><td><b>Google AlphaChip</b></td><td>RL 做 macro placement / floorplan</td><td>已上 TPU v5e/v5p/Trillium；<b>开源</b> circuit_training + 预训练 checkpoint</td></tr>
+        <tr><td><b>Siemens Calibre.AI</b></td><td>signoff DRC / fill ML 加速</td><td>—</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h4>B · LLM-Agent = 会用工具的"操作员"</h4>
+      <p class="meta">有"手"(生成 Tcl/Py 跑工具) + "眼"(读 log/报告定位错误)，闭环驱动流程 ← 本文档主角</p>
+      <table>
+        <tr><th>系统</th><th>一句话定位</th></tr>
+        <tr><td><span class="tag r1">R1</span> ChatEDA</td><td>微调 LLM 直接拆任务 + 写脚本</td></tr>
+        <tr><td><span class="tag r2">R2</span> ChipNeMo</td><td>把模型本身驯成领域专家 + RAG</td></tr>
+        <tr><td><span class="tag r3">R3</span> ORFS-agent</td><td>LLM 当黑盒优化的搜索策略（开源·Claude）</td></tr>
+        <tr><td><span class="tag r4">R4</span> AutoEDA</td><td>LLM 只吐结构化 IR，模板渲染脚本</td></tr>
+        <tr><td><span class="tag r5">R5</span> EDAid</td><td>多 agent 发散 + 中央裁决</td></tr>
+      </table>
+      <p class="note">注：L0–L5 自治分级见下方阶梯。这 5 个系统都落在 <b>L3「AI 开车，人监控」</b>。</p>
+    </div>
+  </div>
+
+  <h3>自治分级 L0 → L4（做路线图时的标尺）</h3>
+  <div class="ladder">
+    <div class="rung"><div class="lv">L0/1</div><div><b>工具辅助人</b> — 人定流程，工具解子问题（传统 P&R）。<small>纯算法优化，无 AI 决策权。</small></div></div>
+    <div class="rung"><div class="lv">L2</div><div><b>AI Copilot（预测）</b> — ML 加速某一步，AI 只当顾问、没有执行权。<small>如时序/拥塞预测模型。</small></div></div>
+    <div class="rung here"><div class="lv">L3</div><div><b>Agentic（编排）· "AI 开车，人监控"</b> — agent 自主拆任务、生成脚本、调工具闭环。<small>← 本文 5 系统 & 你的仓库都在这里。</small></div></div>
+    <div class="rung"><div class="lv">L4</div><div><b>自驱设计 · "人给意图，AI 跑完 RTL→GDSII"</b> — 零人工干预全流程。<small>目前无人达成（sim-to-silicon gap）。</small></div></div>
+  </div>
+  <p class="note">综述把 agentic 认知栈分三层：<b>感知</b>（netlist/log/layout→结构化）→ <b>认知</b>（neuro-symbolic：LLM 提假设、solver 按物理约束验证 + RAG 长程记忆）→ <b>行动</b>（生成 Tcl/Py，工具当确定性 solver，带沙箱回滚）。来源：《The Dawn of Agentic EDA》。</p>
+</section>
+
+<!-- ============ 五大范式 ============ -->
+<section id="para">
+  <h2>五大范式：LLM 在流程里到底干多少活</h2>
+  <p>按"LLM 承担的职责从重到轻"排列。核心区别在于：<b>LLM 是直接产最终脚本，还是只产中间表示交给确定性组件落地。</b></p>
+  <table>
+    <tr><th>范式</th><th>代表</th><th>LLM 角色</th><th>EDA 工具角色</th><th>是否微调</th><th>硬指标</th></tr>
+    <tr><td><span class="tag r1">R1 规划+写脚本</span></td><td>ChatEDA / AutoMage</td><td>拆任务 + 直接生成 Tcl/Py</td><td>哑执行器</td><td>是(QLoRA)</td><td>88% Grade A (GPT-4 仅 58%)</td></tr>
+    <tr><td><span class="tag r2">R2 领域模型+RAG</span></td><td>ChipNeMo (NVIDIA)</td><td>被驯成领域专家答/写</td><td>执行 + 供检索语料</td><td>是(DAPT+SFT)</td><td>小模型打过更大通用模型</td></tr>
+    <tr><td><span class="tag r3">R3 工具型优化器</span></td><td><b>ORFS-agent</b> (UCSD)</td><td>搜索策略：选下一组超参</td><td>黑盒目标函数</td><td>否(纯 ICL)</td><td>WL/时钟 <span class="num">+13%</span>，迭代 <span class="num">-40%</span></td></tr>
+    <tr><td><span class="tag r4">R4 结构化IR+模板</span></td><td>AutoEDA</td><td>只吐 typed IR，不吐脚本</td><td>校验+模板渲染+修复</td><td>是(0.6B小模型)</td><td>token <span class="num">-97%</span>，执行成功 100% vs 37%</td></tr>
+    <tr><td><span class="tag r5">R5 多agent发散</span></td><td>EDAid / ChipLlama</td><td>多份草稿 + 中央裁决</td><td>执行 + 打分</td><td>是(混合指令)</td><td>70B 94%→<span class="num">100%</span></td></tr>
+  </table>
+
+  <div class="grid2">
+    <div class="card r1">
+      <h4><span class="tag r1">R1</span> ChatEDA — 经典"三段式"</h4>
+      <p class="meta">底座 Llama2-70B 微调成 AutoMage · MLCAD 2023</p>
+      <div class="flow">
+        <span class="step">NL 需求</span><span class="arrow">→</span>
+        <span class="step">Task Planning<br>拆子任务序列</span><span class="arrow">→</span>
+        <span class="step">Script Gen<br>子任务+API文档→Py</span><span class="arrow">→</span>
+        <span class="step">Execution<br>跑 OpenROAD API</span>
+      </div>
+      <div class="kv"><b>实现：</b>self-instruction 造 ~1500 条 <code>&lt;需求,plan,script&gt;</code> + QLoRA(NF4 4-bit)，8×A100 训 15 epoch；API 文档拼进 prompt 让模型"看"可用函数。</div>
+      <div class="kv"><b>原理/教训：</b><span class="bad">没有运行时纠错、不把生成代码校回真实 API</span>，全靠微调鲁棒性硬扛——这正是 R4 要解决的痛点。</div>
+    </div>
+
+    <div class="card r2">
+      <h4><span class="tag r2">R2</span> ChipNeMo — 先把"模型"变专家</h4>
+      <p class="meta">NVIDIA · 不做复杂 agent，做领域适配</p>
+      <div class="kv"><b>四件套：</b></div>
+      <ul>
+        <li>① 定制 tokenizer：BPE 词表 32k→41k，EDA 术语/Tcl 当一等公民</li>
+        <li>② DAPT 领域持续预训练（内部文档/脚本/bug）</li>
+        <li>③ SFT 领域指令微调</li>
+        <li>④ 领域 RAG：微调 e5 检索器(3000 样本)，答题先检索再塞 prompt</li>
+      </ul>
+      <div class="kv"><b>原理：</b>领域适配 + RAG 让小模型打过更大通用模型；<b>RAG 是抗幻觉主力</b>。落地 3 应用：助手 chatbot / EDA 脚本生成 / bug 总结。</div>
+    </div>
+
+    <div class="card r3">
+      <h4><span class="tag r3">R3</span> ORFS-agent — 跟你最像 ⭐ 开源</h4>
+      <p class="meta">UCSD Kahng 组 · Claude Sonnet 3.5 · 零微调 · MLCAD 2025</p>
+      <div class="flow">
+        <span class="step">观察<br>读上轮报告</span><span class="arrow">→</span>
+        <span class="step">推理<br>建代理模型判方向</span><span class="arrow">→</span>
+        <span class="step">行动<br>function-call 设超参</span><span class="arrow">→</span>
+        <span class="step">收敛?<br>否则回循环</span>
+      </div>
+      <div class="kv"><b>本质：</b>把 LLM 当成<b>黑盒优化的搜索策略</b>，替代贝叶斯优化里的高斯过程。模型无关、即插即用。</div>
+      <div class="kv"><b>数字：</b>wirelength 和有效时钟周期 <span class="num">改善 &gt;13%</span> 且 <span class="num">少用 40% 迭代</span>，干过 Bayesian opt。</div>
+      <div class="kv"><b>代码：</b><code>github.com/ABKGroup/ORFS-Agent</code>；2026-01 续作让 coding-agent 直接改流程代码提 QoR。</div>
+    </div>
+
+    <div class="card r4">
+      <h4><span class="tag r4">R4</span> AutoEDA — 最干净的工程范式</h4>
+      <p class="meta">三层 · MCP 接口 · "别让 LLM 直接写脚本"</p>
+      <table>
+        <tr><th>层</th><th>组件</th><th>职责</th></tr>
+        <tr><td>Client</td><td>微调 0.6B Qwen3</td><td>NL→typed IR(带单位/枚举)，grammar-constrained decoding 强制合规</td></tr>
+        <tr><td>Server</td><td>每 stage 一个 MCP server</td><td>约束校验(裁越界/补默认/解冲突)→填进预制 Tcl 模板</td></tr>
+        <tr><td>Executor</td><td>商业 EDA 工具</td><td>跑 Tcl、监控 log，失败调内置 rule-based fixer</td></tr>
+      </table>
+      <div class="kv"><b>原理：</b>LLM 端到端吐 Tcl 太脆(字段错/漏参)；<b>只吐结构化参数 IR，确定性模板落地</b>。结果 token <span class="num">378 vs 12,870</span>、执行成功 <span class="num">100% vs 37%</span>。</div>
+    </div>
+
+    <div class="card r5">
+      <h4><span class="tag r5">R5</span> EDAid / ChipLlama — 用冗余抗长链失败</h4>
+      <p class="meta">Llama3 + 混合指令微调 · NAACL 2025</p>
+      <div class="flow">
+        <span class="step">3× 发散 agent<br>不同 few-shot 并行写脚本</span><span class="arrow">→</span>
+        <span class="step">决策 agent<br>按 yes-token 概率打分选最优</span>
+      </div>
+      <div class="kv"><b>ChipLlama：</b>混合指令微调 = MathInstruct 80K(推理)+CodeInstruct 100K(写码)+EDAInstruct 8K(领域)。</div>
+      <div class="kv"><b>原理：</b>EDA 是长链调用，单 agent 中间错一步全崩；多 agent 不同 few-shot 探索不同路径，<b>降低相关性失败</b>。&gt;3 个发散 agent 收益饱和。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 实现机制对照 ============ -->
+<section id="impl">
+  <h2>实现机制对照：同一问题的不同解法</h2>
+  <p>把 5 个系统拍平到关键工程维度上横向对比——选型时直接查这张表。</p>
+  <table>
+    <tr>
+      <th>维度</th><th>ChatEDA <span class="tag r1">R1</span></th><th>ChipNeMo <span class="tag r2">R2</span></th>
+      <th>ORFS-agent <span class="tag r3">R3</span></th><th>AutoEDA <span class="tag r4">R4</span></th><th>EDAid <span class="tag r5">R5</span></th>
+    </tr>
+    <tr><td><b>LLM 底座</b></td><td>Llama2-70B 微调</td><td>Llama2 + DAPT</td><td>Claude Sonnet 3.5(无微调)</td><td>Qwen3-0.6B 微调</td><td>Llama3 微调(ChipLlama)</td></tr>
+    <tr><td><b>执行骨架</b></td><td>plan→gen→exec 顺序</td><td>RAG 问答/生成</td><td>ReAct(reason-act-observe)</td><td>分层 client/server/exec</td><td>并行发散+中央选</td></tr>
+    <tr><td><b>LLM 输出形态</b></td><td>直接 Python 脚本</td><td>脚本/答案</td><td>function-call 设超参</td><td><b>typed JSON IR(非脚本)</b></td><td>多份脚本草稿</td></tr>
+    <tr><td><b>工具接口</b></td><td>prompt 拼 API 文档</td><td>—</td><td>function-calling</td><td><b>MCP(JSON-RPC)</b></td><td>tool-calling</td></tr>
+    <tr><td><b>Grounding 手段</b></td><td>靠微调鲁棒性</td><td><b>RAG 检索</b></td><td><b>读 log 闭环 + 迭代</b></td><td><b>schema校验+模板</b></td><td>多数表决</td></tr>
+    <tr><td><b>纠错/回滚</b></td><td><span class="bad">几乎无</span></td><td>—</td><td>下一轮迭代修正</td><td>rule-based fixer 诊断 log</td><td>决策 agent 过滤坏草稿</td></tr>
+    <tr><td><b>跑什么阶段</b></td><td>RTL→GDS 全流程脚本</td><td>脚本/问答(不限阶段)</td><td>flow 超参调优</td><td>synth/place/CTS/route</td><td>全流程脚本生成</td></tr>
+    <tr><td><b>开源</b></td><td>否(数据未放)</td><td>否</td><td><b>是(ABKGroup)</b></td><td>论文(MCP 思路可抄)</td><td>否</td></tr>
+    <tr><td><b>硬指标</b></td><td>88% Grade A</td><td>小模型超大模型</td><td>+13% / -40% 迭代</td><td>token-97% / 100%成功</td><td>70B→100%</td></tr>
+  </table>
+
+  <div class="hl">
+    <b>选型口诀：</b>
+    想<b>跟着 SOTA 模型走、零维护</b> → R3(ORFS-agent 思路)；
+    想<b>产品化、可靠性优先</b> → R4(结构化 IR + 模板)；
+    有<b>大量私有语料、要懂内部术语</b> → R2(领域适配+RAG)；
+    单 agent 长链<b>不稳</b> → 叠 R5(多 agent 发散)。
+    R1 是历史起点，今天不建议照搬（缺纠错）。
+  </div>
+
+  <h3>三种"调参/优化"闭环对比（PPA 最大杠杆）</h3>
+  <table>
+    <tr><th>方式</th><th>搜索策略</th><th>是否需训练</th><th>适合谁</th></tr>
+    <tr><td>商业 DSO.ai / Cerebrus</td><td>RL（黑盒，内置）</td><td>厂商已训</td><td>买得起商业 EDA 的团队</td></tr>
+    <tr><td>传统 AutoTuner</td><td>贝叶斯优化 / 网格</td><td>否</td><td>开源流基线</td></tr>
+    <tr><td><b>ORFS-agent</b></td><td><b>LLM 当搜索策略 + 读报告推理</b></td><td>否(纯 ICL)</td><td><b>你 — 已有 Claude + 报告解析</b></td></tr>
+  </table>
+</section>
+
+<!-- ============ 六条原理 ============ -->
+<section id="principle">
+  <h2>六条底层原理：所有系统共享的设计逻辑</h2>
+  <p>论文名字花哨，但底层就这 6 条。理解了它们，再看任何新系统都能秒懂。</p>
+  <div class="grid2">
+    <div class="card">
+      <h4>① 神经-符号分工</h4>
+      <p>LLM 做翻译/规划/搜索策略（概率、会错）；EDA 工具 + 校验器做裁判（确定、按物理约束）。<b>永远让确定性组件兜底</b>，别让 LLM 的输出直接成为 ground truth。</p>
+    </div>
+    <div class="card">
+      <h4>② 别吐终态，吐中间表示</h4>
+      <p>成熟系统都不让 LLM 直接产最终脚本，而是产<b>结构化参数 IR</b> → 模板渲染（AutoEDA 最典型）。<span class="pill built">你的 *.yaml handoff 本质就是这条，且做得比多数论文早</span></p>
+    </div>
+    <div class="card">
+      <h4>③ Grounding 三件套</h4>
+      <p><b>RAG</b> 喂文档(ChipNeMo) + <b>tool-feedback</b> 读 log 闭环(ORFS-agent) + <b>constraint validation</b> 裁非法参数(AutoEDA)。三者叠加才稳。</p>
+    </div>
+    <div class="card">
+      <h4>④ 执行骨架 = ReAct / function-calling</h4>
+      <p><code>reason → act(tool) → observe(log) → repeat</code> 几乎是统一范式。差别只在"act 产什么"和"observe 后怎么决策"。</p>
+    </div>
+    <div class="card">
+      <h4>⑤ 长链可靠性靠冗余或迭代</h4>
+      <p>要么<b>多 agent 发散 + 中央裁决</b>(EDAid)，要么<b>单 agent 迭代收敛</b>(ORFS-agent)。单次单链必崩在长流程上。</p>
+    </div>
+    <div class="card">
+      <h4>⑥ 领域适配的两条岔路</h4>
+      <p><b>微调模型</b>(AutoMage/ChipNeMo/ChipLlama，重但强，绑定模型) vs <b>纯 ICL + RAG</b>(ORFS-agent，轻、模型无关、即插即用)。前者适合窄场景产品化，后者适合跟着 SOTA 走。</p>
+    </div>
+  </div>
+  <p class="note">综述列的公开未解难题：sim-to-silicon gap（无 human-free 流片）· 高质量先进节点数据稀缺 · 概率 LLM 与零容忍物理约束的张力 · 工具接口碎片化(呼吁 LSP-for-EDA 式标准语义 API，MCP 是雏形) · 幻觉/木马可信度 · 缺系统级 benchmark。</p>
+</section>
+
+<!-- ============ 对照你的仓库 ============ -->
+<section id="mine">
+  <h2>对照 chip-backend-ai 仓库：你在哪、缺什么、怎么补</h2>
+  <div class="hl">
+    <b>定位：</b>你现在的架构 = <span class="tag r4">R4 结构化 handoff</span> + <span class="tag r1">R1 agent 现场推理</span> 的混合体，落在 <b>L3</b>。
+    缺的正是 <span class="tag r3">R3 的迭代优化闭环</span>——也就是 PPA 的最大杠杆。
+  </div>
+
+  <h3>你已经做对的（多数论文还在追）</h3>
+  <table>
+    <tr><th>你仓库里的东西</th><th>对应原理/范式</th></tr>
+    <tr><td><code>executor: skill / agent / human</code> 三态 + HITL gate（confirm_macro / waiver_review / final_checklist）</td><td>L3「AI 开车人监控」标准形态 <span class="pill built">✓</span></td></tr>
+    <tr><td><code>parse-eda-report</code>(眼) + <code>run-eda-script</code>(手) + gate 产 <code>eval_result</code></td><td>原理④ ReAct 闭环 + 原理③ tool-feedback <span class="pill built">✓</span></td></tr>
+    <tr><td>文件系统 <code>*.yaml</code> handoff（global_spec / stage_spec / eval_result 模板）</td><td>原理② 结构化 IR；业界还在抱怨脆弱文本解析，你领先 <span class="pill built">✓</span></td></tr>
+    <tr><td>state_manager 状态机 + retry budget + rollback</td><td>原理① 确定性兜底 <span class="pill built">✓</span></td></tr>
+  </table>
+
+  <h3>最值得补强的（按 ROI 排序）</h3>
+  <table>
+    <tr><th>#</th><th>补什么</th><th>抄哪个</th><th>落到你仓库哪里</th></tr>
+    <tr>
+      <td>1</td>
+      <td><b>设计空间探索 / 迭代调参环</b><br><span class="bad">最大 PPA 杠杆，你现在最缺</span></td>
+      <td>R3 ORFS-agent</td>
+      <td>新增 cross-cutting executor：读 <code>eval_result</code>→调参→重跑→比上轮→边际递减即停，套在现有 gate 之上。你的 retry budget 是天然状态载体。</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td><b>macro 摆放接 RL</b></td>
+      <td>AlphaChip</td>
+      <td><code>macro_placement</code> step 现在是 floorplan-agent 现场推理，可换/补 <code>circuit_training</code> 预训练 checkpoint 做 zero-shot，再让 agent 微调。唯一被流片验证的后端 RL。</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td><b>参数 IR + 校验 + 模板</b><br>替代 agent 直接写脚本</td>
+      <td>R4 AutoEDA</td>
+      <td>给 gen_cts_spec / power_plan 等步骤定义 typed IR schema（放 <code>templates/</code>），agent 只吐参数，确定性模板渲染 Tcl。降幻觉、token、提成功率。</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td><b>显式停机判据</b></td>
+      <td>R3</td>
+      <td>把 slack/congestion 阈值 + 边际收益固化进 gate step 或 timing-eco-agent，别让 retry 只是"重跑一遍"。</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td><b>难步骤叠多 agent 发散</b><br>(可选)</td>
+      <td>R5 EDAid</td>
+      <td>对 drc_repair / fix_strategy 这种易错步，跑 N 份方案 + 用 eval_result 当裁判选最优。</td>
+    </tr>
+  </table>
+
+  <div class="hl">
+    <b>最低成本第一步：</b>把 ORFS-agent 那套"读 <code>eval_result</code> → 调参 → 重跑 → 收敛即停"的 ReAct 环做成一个新 executor 类型。
+    它<b>开源、Claude 驱动、和你技术栈天然对齐</b>，不需要训练任何模型。
+  </div>
+</section>
+
+<!-- ============ 资料源 ============ -->
+<section id="src">
+  <h2>资料源</h2>
+  <h3>LLM-Agent 流（本文档主体）</h3>
+  <ul class="src">
+    <li>ChatEDA / AutoMage — <a href="https://arxiv.org/html/2308.10204v3">arXiv 2308.10204</a> · <a href="https://www.cse.cuhk.edu.hk/~byu/papers/C177-MLCAD2023-ChatEDA.pdf">MLCAD 2023 PDF</a></li>
+    <li>ChipNeMo (NVIDIA) — <a href="https://arxiv.org/pdf/2311.00176">arXiv 2311.00176</a> · <a href="https://graphcore-research.github.io/chipnemo/">Graphcore 解读</a></li>
+    <li>ORFS-agent (UCSD/Kahng) — <a href="https://arxiv.org/pdf/2506.08332">arXiv 2506.08332</a> · <b>开源</b> <a href="https://github.com/ABKGroup/ORFS-Agent">github.com/ABKGroup/ORFS-Agent</a></li>
+    <li>QoR coding-agent 续作 (2026-01) — <a href="https://arxiv.org/pdf/2601.06268">arXiv 2601.06268</a></li>
+    <li>AutoEDA (MCP 微服务) — <a href="https://arxiv.org/html/2508.01012v2">arXiv 2508.01012</a></li>
+    <li>EDAid / ChipLlama "Divergent Thoughts" — <a href="https://arxiv.org/html/2502.10857v1">arXiv 2502.10857</a></li>
+  </ul>
+  <h3>综述 / 坐标系</h3>
+  <ul class="src">
+    <li>《The Dawn of Agentic EDA》自治分级 L0–L4 — <a href="https://arxiv.org/html/2512.23189v2">arXiv 2512.23189</a></li>
+    <li>Agentic AI In Chip Design — <a href="https://semiengineering.com/agentic-ai-and-chip-design/">SemiEngineering</a></li>
+  </ul>
+  <h3>商业 RL/ML 引擎（坐标）</h3>
+  <ul class="src">
+    <li>Synopsys DSO.ai — <a href="https://www.synopsys.com/ai/ai-powered-eda/dso-ai.html">官方页</a></li>
+    <li>Google AlphaChip / circuit_training — <a href="https://github.com/google-research/circuit_training">GitHub</a> · <a href="https://x.com/JeffDean/status/1839308592408834559">Jeff Dean 公告</a></li>
+  </ul>
+  <p class="note">检索时间 2026-06。数字均取自上述论文/官方披露；商业 PPA 数字为厂商口径，仅作量级参考。</p>
+</section>
+
+</main>
+
+<script>
+  const tabs=document.querySelectorAll('nav.tabs button');
+  const secs=document.querySelectorAll('main section');
+  tabs.forEach(b=>b.addEventListener('click',()=>{
+    tabs.forEach(x=>x.classList.remove('active'));
+    secs.forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    document.getElementById(b.dataset.t).classList.add('active');
+    window.scrollTo({top:0,behavior:'smooth'});
+  }));
+</script>
+</body>
+</html>

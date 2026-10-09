@@ -1,0 +1,26 @@
+# ===========================================================================
+# run_power_plan.tcl  —  golden template, rendered by render-tcl
+#   Mechanical step: source the generated power-plan script and build the PG
+#   grid (rings / stripes / sroute / follow-pin). No decision layer — params
+#   come straight from the stage spec.
+#   double-brace placeholders filled from stage spec + parameters + --var.
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- source the power-plan script emitted by gen_power_plan ----------------
+source {{artifact_dir}}/power_plan.tcl
+
+# --- follow-pin rails on the std-cell rows (M1 power rails) ----------------
+sroute -nets { {{power_net}} {{ground_net}} } -connect corePin \
+    -layerChangeRange { {{follow_pin_layer}} {{follow_pin_layer}} }
+
+# --- redundant-via / via-generation policy on the PG grid ------------------
+setViaGenMode -optimize_cross_via true
+editPowerVia -add_vias 1 -nets { {{power_net}} {{ground_net}} }
+
+# --- verify PG connectivity before persisting ------------------------------
+verifyConnectivity -nets { {{power_net}} {{ground_net}} } -type special \
+    > {{report_dir}}/pg_connectivity.rpt
+
+# --- persist the design with the power grid built --------------------------
+defOut {{artifact_dir}}/pg.def

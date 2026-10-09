@@ -1,0 +1,52 @@
+# SIMULATED fixture — cts stage spec for the e2e validation.
+# Derived from templates/stage_spec_template.yaml; modeled on placement.yaml.
+#
+# Metric names are chosen to (a) exist in core/router.py METRIC_PATTERNS so the
+# parser extracts them (global_skew_ps → "global skew (ps) = <v>",
+# max_insertion_delay_ps → "max insertion delay (ps) = <v>"), and (b) be
+# satisfiable by core/sim/mock_eda in-range picks, so the cts_eval gate PASSes in
+# SIMULATION mode.
+
+stage: "cts"
+spec_version: "v1"
+
+description: "CTS quality gate (clock skew / insertion delay) for the design (simulation)."
+
+metrics:
+  - name: global_skew_ps           # worst global clock skew after CTS (ps; lower = better)
+    target:
+      min: null
+      max: 80.0
+    description: "Worst-case global clock skew after clock-tree synthesis; must stay under budget."
+  - name: max_insertion_delay_ps   # deepest clock insertion delay (ps; lower = better)
+    target:
+      min: null
+      max: 400.0
+    description: "Maximum clock insertion delay (root-to-leaf latency); must stay under budget."
+
+# parameters feed both the decision script (gen_decisions.py reads the skew +
+# insertion-delay targets + these) and render-tcl (spec.parameters are merged
+# under decisions.params, so every {{placeholder}} in templates/tcl/cts/*.tcl.tmpl
+# resolves). Path-like vars (report_dir/artifact_dir) come from the harness via
+# --var, not here.
+parameters:
+  # --- gen_cts_spec (CTS strategy; AI baseline, gen_decisions may refine) -----
+  target_skew_ps: 60                # set_ccopt_property target_skew (under the skew budget)
+  target_max_trans_ps: 100          # DRV transition target (max_tran on clock nets)
+  max_fanout: 32                    # max fanout per clock buffer (set_ccopt_property max_fanout)
+  ndr_name: "CTS_2W2S"              # clock-net non-default routing rule name
+  ndr_spacing_mult: 2               # NDR spacing multiplier
+  ndr_width_mult: 2                 # NDR width multiplier
+  clock_buffer_cell: "CLKBUF"       # clock-tree buffer leaf cell
+  clock_inverter_cell: "CLKINV"     # clock-tree inverter leaf cell
+  use_inverters: "true"            # use inverter pairs in the clock tree
+  skew_group: "main_clk_group"      # skew group name balancing this clock domain
+  # --- postcts_opt (mechanical post-CTS optimization) ------------------------
+  allow_setup_degrade: "true"       # -fixHoldAllowSetupTnsDegrade
+  hold_target_slack_ns: 0.05        # post-CTS hold target slack
+  setup_target_slack_ns: 0.0        # post-CTS setup target slack
+
+upstream:
+  required_checkpoint: null
+  required_stages:
+    - placement

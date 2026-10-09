@@ -1,0 +1,41 @@
+# SIMULATED fixture — import stage spec for the e2e validation.
+# Derived from templates/stage_spec_template.yaml.
+#
+# Metric names are chosen to (a) exist in core/router.py METRIC_PATTERNS so the
+# parser extracts them, and (b) be satisfiable by core/sim/mock_eda in-range
+# picks, so the import_eval gate PASSes in SIMULATION mode.
+
+stage: "import"
+spec_version: "v1"
+
+description: "Library/constraint completeness gate for design import (simulation)."
+
+metrics:
+  - name: drc_violations          # post-import integrity: must be clean
+    target:
+      min: null
+      max: 0
+    description: "check_design integrity violations; 0 = clean import."
+  - name: utilization             # density/completeness proxy at import
+    target:
+      min: 0.60
+      max: 0.80
+    description: "Reported core density after init_design; within target band."
+
+parameters:
+  top_module: "sim_block"
+  power_net: "VDD"
+  ground_net: "VSS"
+  power_pin: "VDD"
+  ground_pin: "VSS"
+  libset_name: "ss_typ"
+  rc_corner: "rc_typ"
+  temperature: "25"
+  delay_corner: "dc_typ"
+  constraint_mode: "func"
+  analysis_view: "av_typ"
+  check_type: "all"
+
+upstream:
+  required_checkpoint: null
+  required_stages: []

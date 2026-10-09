@@ -1,0 +1,44 @@
+# ===========================================================================
+# fix_strategy.tcl  —  golden template, rendered by render-tcl
+#   AI-decision step (timing-eco-design / timing_eco.fix_strategy): decide the
+#   timing-closure / ECO repair strategy — which paths to fix and the repair
+#   means (buffer insertion, gate resize / Vt-swap, useful skew, local reroute),
+#   and the setup vs hold vs DRV tradeoffs. This step PRODUCES an ECO change-list
+#   artifact (eco.changes), NOT a .def; the downstream apply_eco step replays it.
+#   double-brace placeholders filled from stage spec + decisions(params) + --var;
+#   '### @inject:<block>' injects AI-authored fragments from decisions.fragments
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- optimization mode: effort + what to recover ----------------------------
+# (setup recovery + hold fix; allow a bounded setup/TNS degrade while fixing hold)
+setOptMode -fixHoldAllowSetupTnsDegrade {{allow_setup_degrade}}
+setOptMode -holdTargetSlack {{hold_target_slack_ns}}
+setOptMode -setupTargetSlack {{setup_target_slack_ns}}
+setOptMode -fixFanoutLoad {{fix_drv}}
+setOptMode -optimizeFootprint {{resize_enable}}
+
+# --- ECO buffer / hold-fix cell library (cells the ECO may use) -------------
+setOptMode -setupFixingCells { {{setup_buffer_cell}} }
+setOptMode -holdFixingCells { {{hold_buffer_cell}} }
+
+# --- useful-skew (let CTS borrow time across launch/capture when enabled) ----
+set_ccopt_property useful_skew {{useful_skew_enable}}
+
+# --- materialize the ECO change list (setup + hold + DRV in path-group order)
+# optDesign emits an ECO change list rather than mutating the DEF in place;
+# apply_eco replays these onto routed_clean.def.
+optDesign -postRoute -setup -effort {{setup_fix_effort}} \
+    -outDir {{artifact_dir}} -prefix eco_setup
+optDesign -postRoute -hold  -effort {{hold_fix_effort}} \
+    -outDir {{artifact_dir}} -prefix eco_hold
+setEcoMode -honorDontUse true -honorFixedStatus true
+setEcoMode -maxBufferCount {{max_buffer_count}}
+
+# --- AI-authored targeted ECO ops (verified via search-eda-command) ---------
+# (e.g. size_cell <inst> <lib_cell> ; insertRepeater -net <net> -cell <buf> ;
+#  setUsefulSkewMode -maxSkew <ns> for a specific launch/capture pair ...)
+### @inject:eco_ops
+
+# --- write the consolidated ECO change list (the step output) ---------------
+saveTimingEco -file {{artifact_dir}}/eco.changes

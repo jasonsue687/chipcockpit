@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>芯片后端设计 · 全流程 Stage 与详细工作清单</title>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#1e293b; --panel2:#273449; --line:#334155;
+    --text:#e2e8f0; --muted:#94a3b8; --accent:#38bdf8; --accent2:#22d3ee;
+    --ok:#22c55e; --warn:#f59e0b; --err:#ef4444; --info:#a78bfa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"Segoe UI",Helvetica,"PingFang SC","Microsoft YaHei",sans-serif;
+       background:var(--bg);color:var(--text);line-height:1.55}
+  header{padding:28px 40px;background:linear-gradient(135deg,#0b1224 0%,#172554 100%);
+         border-bottom:1px solid var(--line)}
+  header h1{margin:0;font-size:24px}
+  header p{margin:6px 0 0;color:var(--muted);font-size:14px}
+  nav.tabs{display:flex;flex-wrap:wrap;gap:6px;padding:14px 40px;background:#0b1224;
+           border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
+  nav.tabs button{background:transparent;color:var(--muted);border:1px solid transparent;
+                  padding:8px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-family:inherit}
+  nav.tabs button:hover{color:var(--text);background:#1e293b}
+  nav.tabs button.active{color:var(--accent);background:#0f1f3a;border-color:var(--accent)}
+  main{padding:30px 40px;max-width:1380px;margin:0 auto}
+  section{display:none;animation:fade .25s ease}
+  section.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  h2{font-size:20px;border-left:4px solid var(--accent);padding-left:12px;margin-top:0}
+  h3{font-size:16px;color:var(--accent2);margin-top:28px;display:flex;align-items:center;gap:10px}
+  p{color:#cbd5e1}
+  .stagenum{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;
+            border-radius:50%;background:#0f1f3a;border:2px solid var(--accent);color:var(--accent);
+            font-size:14px;font-weight:700;flex:none}
+  table{width:100%;border-collapse:collapse;margin:10px 0 26px;font-size:13.5px}
+  th,td{padding:9px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  th{background:#0b1224;color:var(--accent2);font-weight:600}
+  tr:hover td{background:#1a2540}
+  td code,p code,li code{font-family:"SF Mono",Consolas,monospace;color:#fbbf24;font-size:12.5px}
+  .tag{display:inline-block;font-size:11px;padding:2px 9px;border-radius:10px;
+       background:#334155;color:var(--text);white-space:nowrap}
+  .tag.ok{background:#14532d;color:#bbf7d0}
+  .tag.warn{background:#7c2d12;color:#fed7aa}
+  .tag.err{background:#7f1d1d;color:#fecaca}
+  .tag.info{background:#3730a3;color:#c7d2fe}
+  .new{display:inline-block;font-size:10px;padding:1px 6px;border-radius:8px;background:#3730a3;
+       color:#c7d2fe;margin-left:6px;vertical-align:middle;font-weight:600}
+  .lead{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 20px;margin:18px 0}
+  .lead b{color:var(--accent)}
+  .ovw td:first-child{white-space:nowrap}
+  .col-num{width:42px;text-align:center}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;margin:12px 0;font-size:12.5px;color:var(--muted);
+          background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 16px}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  footer{padding:24px 40px;color:var(--muted);font-size:12px;border-top:1px solid var(--line)}
+  .stage-block{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+               padding:18px 22px;margin:0 0 22px}
+  .meta-row{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 14px}
+  .chip{font-size:12px;padding:4px 10px;border-radius:8px;background:#0b1224;border:1px solid var(--line);color:var(--muted)}
+  .chip b{color:var(--accent2)}
+  .skcol{width:118px}
+</style>
+</head>
+<body>
+<header>
+  <h1>芯片后端设计 · 全流程 Stage 与详细工作清单</h1>
+  <p>从网表导入到 GDS 交付的完整物理实现流程 · 命令术语以 Cadence Innovus 为参照 · 含细颗粒度子步骤与 Skill 化判定</p>
+</header>
+
+<nav class="tabs">
+  <button class="active" data-tab="overview">总览表</button>
+  <button data-tab="detail">逐 Stage 详细工作</button>
+  <button data-tab="ai">AI 辅助难度</button>
+  <button data-tab="map">对照本系统</button>
+</nav>
+
+<main>
+
+<!-- ============ 总览 ============ -->
+<section id="overview" class="active">
+  <h2>全流程 Stage 总览</h2>
+  <div class="lead">
+    后端（物理实现）流程通常分为 <b>9 个 stage（#0–#8）</b>。每个 stage 有明确的输入、产出 checkpoint 与进入下一阶段的 gate。
+    工业界常把 #0/#1/#2/#3 在工具里连续执行，但它们的判据互相独立，建模时建议分清。
+    <br><b>RC 抽取 / SPEF</b> 是贯穿 post-route 与 signoff 的横切动作（timing 准不准的前提），在下表中归入 #7。
+  </div>
+  <table class="ovw">
+    <thead>
+      <tr><th class="col-num">#</th><th>Stage</th><th>一句话职责</th><th>关键产出 / 出口 gate</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="col-num">0</td><td><b>Design Import</b><br>数据准备</td><td>读入网表/约束/库，配置 MMMC，globalNetConnect</td><td>库约束零 error、时钟全定义</td></tr>
+      <tr><td class="col-num">1</td><td><b>Floorplan</b><br>布局规划</td><td>定 die/core、摆 IO pin/pad、macro 摆放、blockage</td><td>初始 DEF、面积冻结、macro 无重叠</td></tr>
+      <tr><td class="col-num">2</td><td><b>Power Planning</b><br>电源规划</td><td>电源环/条带、sroute、tap/decap/switch</td><td>PG 连通、static IR drop 达标</td></tr>
+      <tr><td class="col-num">3</td><td><b>Placement</b><br>标准单元布局</td><td>std cell 布局 + pre-CTS 优化、scan reorder、tie cell</td><td>合法布局、congestion 可接受、pre-CTS timing</td></tr>
+      <tr><td class="col-num">4</td><td><b>CTS</b><br>时钟树综合</td><td>时钟树构建、skew 平衡、clock 布线、useful skew</td><td>skew/insertion delay 达标、post-CTS timing</td></tr>
+      <tr><td class="col-num">5</td><td><b>Routing</b><br>布线</td><td>全局→详细布线、NDR/shielding、DRC/antenna 修复</td><td>100% routed、DRC 趋零、timing 不退化</td></tr>
+      <tr><td class="col-num">6</td><td><b>Timing Closure</b><br>时序收敛 / ECO</td><td>signoff STA、setup/hold 修复、功耗 ECO、ecoRoute</td><td>全 corner WNS/TNS/hold 达标</td></tr>
+      <tr><td class="col-num">7</td><td><b>Signoff</b><br>物理验证</td><td>RC 抽取/SPEF、DRC/LVS、IR/EM、metal fill、signoff STA</td><td>DRC clean、LVS clean、IR/EM 达标</td></tr>
+      <tr><td class="col-num">8</td><td><b>Tapeout</b><br>交付</td><td>filler、seal ring、GDS merge、streamOut GDS</td><td>GDSII 通过最终验证</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============ 逐 Stage 详细 ============ -->
+<section id="detail">
+  <h2>逐 Stage 详细工作</h2>
+  <div class="legend">
+    <span><span class="new">➕</span> 本轮补全的子步骤</span>
+    <span><span class="tag ok">✅ 机械</span> 确定性/可参数化 → 适合做 skill</span>
+    <span><span class="tag warn">⚠️ 部分</span> 机械部分可 skill，判断部分留给 agent</span>
+    <span><span class="tag err">❌ 判断</span> 经验/策略/人工 gate，不做 skill</span>
+  </div>
+
+  <!-- 0 -->
+  <div class="stage-block">
+    <h3><span class="stagenum">0</span> Design Import / 数据准备</h3>
+    <div class="meta-row">
+      <span class="chip"><b>输入：</b>综合后网表、SDC、std cell 库、tech LEF、macro LEF、MMMC/RC 配置</span>
+    </div>
+    <table>
+      <thead><tr><th style="width:38%">详细工作</th><th style="width:30%">关键命令 (Innovus)</th><th class="skcol">Skill 化</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>读入网表与物理/时序库</td><td><code>read_netlist</code> · <code>read_physical -lef</code></td><td><span class="tag ok">✅ 机械</span></td><td>std cell + macro + tech LEF</td></tr>
+        <tr><td>读 RC tech / QRC techfile / captable <span class="new">➕</span></td><td><code>read RC tech</code></td><td><span class="tag ok">✅ 机械</span></td><td>RC 抽取设置，否则 timing 不准</td></tr>
+        <tr><td>globalNetConnect（连 PG 逻辑网） <span class="new">➕</span></td><td><code>globalNetConnect</code></td><td><span class="tag ok">✅ 机械</span></td><td>cell PG pin → VDD/VSS</td></tr>
+        <tr><td>读 tie / physical-only cell、don't-use 列表 <span class="new">➕</span></td><td>—</td><td><span class="tag ok">✅ 机械</span></td><td>配置可用单元集合</td></tr>
+        <tr><td>配置 MMMC 多模式多角</td><td><code>create_constraint_mode</code> · <code>create_analysis_view</code></td><td><span class="tag ok">✅ 机械</span></td><td>ss/ff/tt corner × func/test 模式</td></tr>
+        <tr><td>加载 SDC 约束</td><td><code>read_sdc</code></td><td><span class="tag ok">✅ 机械</span></td><td>时钟、IO delay、false/multicycle</td></tr>
+        <tr><td>读 IO assignment / pad 约束文件 <span class="new">➕</span></td><td>—</td><td><span class="tag ok">✅ 机械</span></td><td>上游给定的 pin/pad 位置</td></tr>
+        <tr><td>读 UPF / CPF 低功耗意图 <span class="new">➕</span></td><td><code>read_power_intent</code></td><td><span class="tag warn">⚠️ 部分</span></td><td>多电压域 / power domain</td></tr>
+        <tr><td>完整性检查（含组合环、unconstrained） <span class="new">➕</span></td><td><code>check_design</code> · <code>check_timing</code></td><td><span class="tag ok">✅ 机械</span></td><td>missing lib、未定义时钟、悬空引用</td></tr>
+      </tbody>
+    </table>
+    <p><b>出口判据：</b>库/约束加载零 error，时钟全部定义，无悬空引用。</p>
+  </div>
+
+  <!-- 1 -->
+  <div class="stage-block">
+    <h3><span class="stagenum">1</span> Floorplan / 布局规划</h3>
+    <div class="meta-row">
+      <span class="chip"><b>输入：</b>导入完成的 design、die/utilization 目标、macro 清单</span>
+      <span class="chip"><b>判断权重：</b>高（最考验经验）</span>
+    </div>
+    <table>
+      <thead><tr><th style="width:38%">详细工作</th><th style="width:30%">关键命令 (Innovus)</th><th class="skcol">Skill 化</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>定义 die/core 尺寸、aspect ratio、形状 <span class="new">➕</span></td><td><code>floorPlan -site -r/-d</code></td><td><span class="tag warn">⚠️ 部分</span></td><td>目标可参数化，矩形/rectilinear 形状需判断</td></tr>
+        <tr><td>摆 IO pin（block 级） <span class="new">➕</span></td><td><code>editPin</code> · <code>assign_io_pins</code></td><td><span class="tag warn">⚠️ 部分</span></td><td>定边/层/顺序/间距；对齐数据流是判断</td></tr>
+        <tr><td>IO/pad ring（top 级）、bump/RDL <span class="new">➕</span></td><td><code>addIoRow</code> · pad ring</td><td><span class="tag warn">⚠️ 部分</span></td><td>pad、corner cell、filler pad、flip-chip bump</td></tr>
+        <tr><td>Macro 摆放（按数据流，靠边/靠角）</td><td><code>placeInstance</code></td><td><span class="tag err">❌ 判断</span></td><td>顺信号流摆放，经验主导</td></tr>
+        <tr><td>Macro 朝向 flip/rotate（为 pin access） <span class="new">➕</span></td><td>—</td><td><span class="tag err">❌ 判断</span></td><td>朝向影响布线可达性</td></tr>
+        <tr><td>Macro 间 channel + halo/keepout</td><td><code>addHaloToBlock</code></td><td><span class="tag warn">⚠️ 部分</span></td><td>给定摆位后可模板化生成</td></tr>
+        <tr><td>多种 blockage（hard/soft/partial/route） <span class="new">➕</span></td><td><code>createPlaceBlockage</code> · <code>createRouteBlockage</code></td><td><span class="tag ok">✅ 机械</span></td><td>控制布局/布线区域</td></tr>
+        <tr><td>power domain / voltage area 定义 <span class="new">➕</span></td><td><code>createVoltageArea</code></td><td><span class="tag warn">⚠️ 部分</span></td><td>多 Vdd 设计</td></tr>
+        <tr><td>partition / black box / 层次化 floorplan <span class="new">➕</span></td><td><code>createPartition</code></td><td><span class="tag err">❌ 判断</span></td><td>层次化流程的切分策略</td></tr>
+        <tr><td>floorplan 检查 <span class="new">➕</span></td><td><code>checkFPlan</code></td><td><span class="tag ok">✅ 机械</span></td><td>验证摆放合法性</td></tr>
+      </tbody>
+    </table>
+    <p><b>出口判据：</b>面积/形状冻结，macro 无重叠，channel 达标，初始 utilization 落在目标区间。</p>
+  </div>
+
+  <!-- 2 -->
+  <div class="stage-block">
+    <h3><span class="stagenum">2</span> Power Planning / 电源规划</h3>
+    <div class="meta-row">
+      <span class="chip"><b>输入：</b>floorplan 后 DEF、功耗预算、IR-drop 目标</span>
+    </div>
+    <table>
+      <thead><tr><th style="width:38%">详细工作</th><th style="width:30%">关键命令 (Innovus)</th><th class="skcol">Skill 化</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>建电源环（core ring + macro ring）</td><td><code>addRing</code></td><td><span class="tag ok">✅ 机械</span></td><td>参数化模板（layer/width/spacing）</td></tr>
+        <tr><td>铺电源条带</td><td><code>addStripe</code></td><td><span class="tag ok">✅ 机械</span></td><td>pitch/width，均匀供电</td></tr>
+        <tr><td>特殊布线 sroute</td><td><code>sroute</code></td><td><span class="tag ok">✅ 机械</span></td><td>连 ring/stripe 到 rail/macro pin/IO</td></tr>
+        <tr><td>follow-pin / std cell M1 rail 布线 <span class="new">➕</span></td><td><code>sroute -nets</code></td><td><span class="tag ok">✅ 机械</span></td><td>标准单元供电轨</td></tr>
+        <tr><td>macro PG pin / secondary PG / always-on <span class="new">➕</span></td><td>—</td><td><span class="tag warn">⚠️ 部分</span></td><td>低功耗设计的二级供电</td></tr>
+        <tr><td>tap cell / endcap</td><td><code>addWellTap</code> · <code>addEndCap</code></td><td><span class="tag ok">✅ 机械</span></td><td>规则化插入</td></tr>
+        <tr><td>power switch（header/footer）插入 <span class="new">➕</span></td><td>—</td><td><span class="tag warn">⚠️ 部分</span></td><td>power gating</td></tr>
+        <tr><td>decap（去耦电容）插入 <span class="new">➕</span></td><td><code>addDeCapCellCandidates</code></td><td><span class="tag ok">✅ 机械</span></td><td>压动态 IR</td></tr>
+        <tr><td>early IR-drop / EM 评估（static + dynamic） <span class="new">➕</span></td><td><code>analyzeIR</code></td><td><span class="tag ok">✅ 机械</span></td><td>验证 PG 强度（结果解析）</td></tr>
+      </tbody>
+    </table>
+    <p><b>出口判据：</b>PG 网络连通无断点，static IR drop 在阈值内（通常 &lt; 电源电压 2–5%），无 floating PG。</p>
+  </div>
+
+  <!-- 3 -->
+  <div class="stage-block">
+    <h3><span class="stagenum">3</span> Placement / 标准单元布局</h3>
+    <div class="meta-row">
+      <span class="chip"><b>输入：</b>floorplan + PG 完成的 DEF</span>
+    </div>
+    <table>
+      <thead><tr><th style="width:38%">详细工作</th><th style="width:30%">关键命令 (Innovus)</th><th class="skcol">Skill 化</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>标准单元布局 + 优化</td><td><code>place_opt_design</code></td><td><span class="tag ok">✅ 机械</span></td><td>含 buffer/sizing/pre-CTS timing（执行）</td></tr>
+        <tr><td>tie cell 插入（tie hi/lo） <span class="new">➕</span></td><td><code>addTieHiLo</code></td><td><span class="tag ok">✅ 机械</span></td><td>常数驱动</td></tr>
+        <tr><td>设置模式 + cell padding / density 控制 <span class="new">➕</span></td><td><code>setPlaceMode</code></td><td><span class="tag warn">⚠️ 部分</span></td><td>timing-driven vs congestion-driven</td></tr>
+        <tr><td>early / trial global route 估 congestion <span class="new">➕</span></td><td><code>earlyGlobalRoute</code></td><td><span class="tag ok">✅ 机械</span></td><td>布局阶段拥塞预判</td></tr>
+        <tr><td>scan chain reorder</td><td><code>scanReorder</code></td><td><span class="tag ok">✅ 机械</span></td><td>按物理位置重排扫描链</td></tr>
+        <tr><td>congestion 分析与缓解</td><td><code>report_congestion</code></td><td><span class="tag warn">⚠️ 部分</span></td><td>分析机械，缓解策略需判断</td></tr>
+        <tr><td>高扇出网综合 (HFNS)</td><td>—</td><td><span class="tag ok">✅ 机械</span></td><td>reset/enable 先做 buffer 树</td></tr>
+        <tr><td>spare / ECO cell 预摆 <span class="new">➕</span></td><td>—</td><td><span class="tag warn">⚠️ 部分</span></td><td>为后续 metal-only ECO 预留</td></tr>
+        <tr><td>布局合法化与检查</td><td><code>refinePlace</code> · <code>checkPlace</code></td><td><span class="tag ok">✅ 机械</span></td><td>无重叠、density 合理</td></tr>
+      </tbody>
+    </table>
+    <p><b>出口判据：</b>合法布局无重叠，congestion overflow 可接受（无明显 hotspot），pre-CTS WNS/TNS 在可收敛范围。</p>
+  </div>
+
+  <!-- 4 -->
+  <div class="stage-block">
+    <h3><span class="stagenum">4</span> CTS / 时钟树综合</h3>
+    <div class="meta-row">
+      <span class="chip"><b>输入：</b>placement 后 DEF、CTS spec（target skew / insertion delay / max trans）</span>
+    </div>
+    <table>
+      <thead><tr><th style="width:38%">详细工作</th><th style="width:30%">关键命令 (Innovus)</th><th class="skcol">Skill 化</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>配置 ccopt spec（skew group/balancing/target） <span class="new">➕</span></td><td><code>create_ccopt_clock_tree_spec</code></td><td><span class="tag warn">⚠️ 部分</span></td><td>buffer 库、target skew、max trans/cap</td></tr>
+        <tr><td>定义 ignore / non-stop / exclude pin <span class="new">➕</span></td><td><code>set_ccopt_property</code></td><td><span class="tag warn">⚠️ 部分</span></td><td>控制时钟树边界</td></tr>
+        <tr><td>clock NDR + clock shielding <span class="new">➕</span></td><td><code>create_route_rule</code></td><td><span class="tag ok">✅ 机械</span></td><td>加宽加间距、抗串扰</td></tr>
+        <tr><td>clock gating / mesh / H-tree 处理 <span class="new">➕</span></td><td>—</td><td><span class="tag err">❌ 判断</span></td><td>高性能拓扑选择</td></tr>
+        <tr><td>时钟树构建 + skew 平衡</td><td><code>ccopt_design</code></td><td><span class="tag ok">✅ 机械</span></td><td>并发时钟+数据优化（执行）</td></tr>
+        <tr><td>clock net 布线 <span class="new">➕</span></td><td>—</td><td><span class="tag ok">✅ 机械</span></td><td>时钟走中高层 + NDR</td></tr>
+        <tr><td>useful skew 优化 <span class="new">➕</span></td><td>—</td><td><span class="tag warn">⚠️ 部分</span></td><td>借时序裕量</td></tr>
+        <tr><td>post-CTS 优化 + DRV 修复</td><td><code>optDesign -postCTS</code></td><td><span class="tag ok">✅ 机械</span></td><td>hold/setup + max trans/cap</td></tr>
+        <tr><td>跨 mode insertion delay 平衡 <span class="new">➕</span></td><td>—</td><td><span class="tag warn">⚠️ 部分</span></td><td>多模式一致性</td></tr>
+        <tr><td>时钟树报告与检查</td><td><code>report_ccopt_clock_trees</code></td><td><span class="tag ok">✅ 机械</span></td><td>skew / insertion / clock power（解析）</td></tr>
+      </tbody>
+    </table>
+    <p><b>出口判据：</b>global skew 达标，insertion delay 在预算内，post-CTS timing（含 hold）无大幅退化，clock transition 达标。</p>
+  </div>
+
+  <!-- 5 -->
+  <div class="stage-block">
+    <h3><span class="stagenum">5</span> Routing / 布线</h3>
+    <div class="meta-row">
+      <span class="chip"><b>输入：</b>CTS 后 DEF</span>
+    </div>
+    <table>
+      <thead><tr><th style="width:38%">详细工作</th><th style="width:30%">关键命令 (Innovus)</th><th class="skcol">Skill 化</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>全局布线 Global Route</td><td><code>routeDesign</code> (global)</td><td><span class="tag ok">✅ 机械</span></td><td>估 congestion，分配资源</td></tr>
+        <tr><td>Track Assignment</td><td>—</td><td><span class="tag ok">✅ 机械</span></td><td>长直线段分配到 track</td></tr>
+        <tr><td>详细布线 Detail Route</td><td><code>routeDesign</code> / NanoRoute</td><td><span class="tag ok">✅ 机械</span></td><td>实际几何布线（执行）</td></tr>
+        <tr><td>关键网 NDR + shielding、SI/timing-driven 模式 <span class="new">➕</span></td><td><code>setNanoRouteMode</code></td><td><span class="tag warn">⚠️ 部分</span></td><td>哪些网用 NDR 是判断</td></tr>
+        <tr><td>Post-route 优化</td><td><code>optDesign -postRoute</code></td><td><span class="tag ok">✅ 机械</span></td><td>修 timing + 处理 SI</td></tr>
+        <tr><td>DRC 修复 + search &amp; repair 迭代 <span class="new">➕</span></td><td><code>verify_drc</code></td><td><span class="tag warn">⚠️ 部分</span></td><td>分类机械，复杂违例策略需判断</td></tr>
+        <tr><td>Antenna 修复（插 diode）</td><td>antenna fixing</td><td><span class="tag ok">✅ 机械</span></td><td>消除天线效应</td></tr>
+        <tr><td>冗余 via 插入 / via pillar / via 优化 <span class="new">➕</span></td><td><code>setNanoRouteMode -drouteUseMultiCutVia</code></td><td><span class="tag ok">✅ 机械</span></td><td>提升良率/可靠性</td></tr>
+        <tr><td>notch/gap fix、wire spreading/widening <span class="new">➕</span></td><td>—</td><td><span class="tag ok">✅ 机械</span></td><td>几何质量优化</td></tr>
+        <tr><td>多重曝光 coloring / DPT <span class="new">➕</span></td><td>—</td><td><span class="tag ok">✅ 机械</span></td><td>先进节点</td></tr>
+        <tr><td>SI / crosstalk 分析</td><td>—</td><td><span class="tag ok">✅ 机械</span></td><td>noise + delay 受扰（解析）</td></tr>
+      </tbody>
+    </table>
+    <p><b>出口判据：</b>100% routed（无 open），DRC 趋零，timing 不退化，antenna 清。</p>
+  </div>
+
+  <!-- 6 -->
+  <div class="stage-block">
+    <h3><span class="stagenum">6</span> Timing Closure / 时序收敛 · ECO</h3>
+    <div class="meta-row">
+      <span class="chip"><b>输入：</b>route 后 DEF + signoff STA 报告</span>
+      <span class="chip"><b>判断权重：</b>高（需定修复策略）</span>
+    </div>
+    <table>
+      <thead><tr><th style="width:38%">详细工作</th><th style="width:30%">关键命令 (Innovus)</th><th class="skcol">Skill 化</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>Signoff STA（跨所有 corner/mode）</td><td><code>report_timing -late/-early</code></td><td><span class="tag ok">✅ 机械</span></td><td>执行 + 报告解析</td></tr>
+        <tr><td>Setup 修复</td><td><code>optDesign -postRoute</code></td><td><span class="tag warn">⚠️ 部分</span></td><td>执行机械，策略选择是判断</td></tr>
+        <tr><td>Hold 修复</td><td><code>optDesign -postRoute -hold</code></td><td><span class="tag warn">⚠️ 部分</span></td><td>插 buffer，注意不破坏 setup</td></tr>
+        <tr><td>SI / crosstalk timing 收敛 <span class="new">➕</span></td><td>—</td><td><span class="tag warn">⚠️ 部分</span></td><td>delay + noise</td></tr>
+        <tr><td>DRV（max trans/cap/fanout）修复 <span class="new">➕</span></td><td>—</td><td><span class="tag ok">✅ 机械</span></td><td>规则化修复</td></tr>
+        <tr><td>min pulse width / clock-gating check 修复 <span class="new">➕</span></td><td>—</td><td><span class="tag warn">⚠️ 部分</span></td><td>时钟相关检查</td></tr>
+        <tr><td>功耗 ECO（leakage 回收 / multi-Vt / downsizing） <span class="new">➕</span></td><td><code>optPower</code></td><td><span class="tag warn">⚠️ 部分</span></td><td>不退化 timing 前提下省功耗</td></tr>
+        <tr><td>增量 ECO（freeze placement）</td><td><code>ecoPlace</code> · <code>ecoRoute</code></td><td><span class="tag ok">✅ 机械</span></td><td>最小化扰动（执行）</td></tr>
+        <tr><td>生成 / 读回 ECO change list <span class="new">➕</span></td><td>—</td><td><span class="tag ok">✅ 机械</span></td><td>ECO 流水线衔接</td></tr>
+        <tr><td>功能性 ECO（metal-only / spare cell） <span class="new">➕</span></td><td>—</td><td><span class="tag err">❌ 判断</span></td><td>逻辑变更，与 timing ECO 区分</td></tr>
+        <tr><td>多 corner 收敛</td><td>—</td><td><span class="tag warn">⚠️ 部分</span></td><td>一 corner 修复不引另一 corner 违例</td></tr>
+      </tbody>
+    </table>
+    <p><b>出口判据：</b>所有 view 下 setup WNS/TNS、hold WNS 满足 <code>target_ppa.timing</code>。</p>
+  </div>
+
+  <!-- 7 -->
+  <div class="stage-block">
+    <h3><span class="stagenum">7</span> Signoff / 物理验证</h3>
+    <div class="meta-row">
+      <span class="chip"><b>输入：</b>timing 收敛后的最终 DEF</span>
+      <span class="chip"><b>工具：</b>StarRC/QRC · Calibre/Pegasus · Voltus · PrimeTime</span>
+    </div>
+    <table>
+      <thead><tr><th style="width:38%">详细工作</th><th style="width:30%">工具 / 命令</th><th class="skcol">Skill 化</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>RC 抽取 → 生成 SPEF <span class="new">➕</span></td><td>StarRC / QRC</td><td><span class="tag ok">✅ 机械</span></td><td><b>signoff timing 的前提</b>，横切动作</td></tr>
+        <tr><td>Signoff STA（含 SI、OCV/AOCV/POCV）</td><td>PrimeTime</td><td><span class="tag ok">✅ 机械</span></td><td>执行 + 解析</td></tr>
+        <tr><td>crosstalk / noise signoff <span class="new">➕</span></td><td>PrimeTime SI</td><td><span class="tag ok">✅ 机械</span></td><td>噪声签核</td></tr>
+        <tr><td>Signoff DRC</td><td>Calibre / Pegasus</td><td><span class="tag ok">✅ 机械</span></td><td>foundry rule deck 全检</td></tr>
+        <tr><td>LVS（版图 vs 原理图）</td><td>Calibre LVS</td><td><span class="tag ok">✅ 机械</span></td><td>连接一致性</td></tr>
+        <tr><td>ERC / floating gate / antenna 最终 <span class="new">➕</span></td><td>—</td><td><span class="tag ok">✅ 机械</span></td><td>电气规则检查</td></tr>
+        <tr><td>Signoff IR-drop（static + dynamic w/ VCD） <span class="new">➕</span></td><td><code>analyzeIR</code> / Voltus</td><td><span class="tag ok">✅ 机械</span></td><td>带活动率的动态压降</td></tr>
+        <tr><td>EM（signal EM + power EM） <span class="new">➕</span></td><td>Voltus</td><td><span class="tag ok">✅ 机械</span></td><td>电迁移可靠性</td></tr>
+        <tr><td>metal density check + metal fill <span class="new">➕</span></td><td><code>addMetalFill</code></td><td><span class="tag ok">✅ 机械</span></td><td>满足 density 规则</td></tr>
+        <tr><td>DFM / litho（LFD）检查 <span class="new">➕</span></td><td>—</td><td><span class="tag ok">✅ 机械</span></td><td>可制造性</td></tr>
+        <tr><td>waiver 判定 <span class="new">➕</span></td><td>—</td><td><span class="tag err">❌ 判断</span></td><td>违例豁免需人类把关</td></tr>
+        <tr><td>Formal / LEC 等价性</td><td>Conformal / Formality</td><td><span class="tag warn">⚠️ 部分</span></td><td>有 ECO 时验证逻辑等价</td></tr>
+      </tbody>
+    </table>
+    <p><b>出口判据：</b>DRC clean、LVS clean、IR/EM 达标、signoff timing 全 view pass。</p>
+  </div>
+
+  <!-- 8 -->
+  <div class="stage-block">
+    <h3><span class="stagenum">8</span> Tapeout / GDS 交付</h3>
+    <div class="meta-row">
+      <span class="chip"><b>判断权重：</b>高（人工终审）</span>
+    </div>
+    <table>
+      <thead><tr><th style="width:38%">详细工作</th><th style="width:30%">命令</th><th class="skcol">Skill 化</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>最终 filler 填充</td><td><code>addFiller</code></td><td><span class="tag ok">✅ 机械</span></td><td>填满空隙满足 density</td></tr>
+        <tr><td>seal ring / scribe line / 对齐 mark / logo <span class="new">➕</span></td><td>—</td><td><span class="tag warn">⚠️ 部分</span></td><td>芯片收尾结构</td></tr>
+        <tr><td>与 analog/硬 IP 的 GDS merge + merge 后 DRC <span class="new">➕</span></td><td>—</td><td><span class="tag warn">⚠️ 部分</span></td><td>顶层集成</td></tr>
+        <tr><td>final antenna diode / dummy 收尾 <span class="new">➕</span></td><td>—</td><td><span class="tag ok">✅ 机械</span></td><td>最终修补</td></tr>
+        <tr><td>输出 GDSII</td><td><code>streamOut</code></td><td><span class="tag ok">✅ 机械</span></td><td>+ LEF/DEF abstract</td></tr>
+        <tr><td>生成交付物</td><td>—</td><td><span class="tag ok">✅ 机械</span></td><td>ECO netlist、SDF、SPEF、报告</td></tr>
+        <tr><td>Tapeout checklist 终审</td><td>—</td><td><span class="tag err">❌ 判断</span></td><td>最终签核清单</td></tr>
+      </tbody>
+    </table>
+    <p><b>出口判据：</b>GDS 通过最终验证，交付包完整。</p>
+  </div>
+</section>
+
+<!-- ============ AI 难度 ============ -->
+<section id="ai">
+  <h2>各 Stage 的 AI 辅助 / 自动化难度</h2>
+  <p>用于判断 agent 应在哪些 stage 全自动推进，哪些 stage 需停下来请人确认。</p>
+  <table>
+    <thead>
+      <tr><th class="col-num">#</th><th>Stage</th><th>可脚本化程度</th><th>人类判断权重</th><th>适合 AI 自动跑？</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="col-num">0</td><td>Design Import</td><td><span class="tag ok">高</span></td><td><span class="tag ok">低</span></td><td>✅ 全自动</td></tr>
+      <tr><td class="col-num">1</td><td>Floorplan (macro/pin)</td><td><span class="tag err">低</span></td><td><span class="tag err">高</span></td><td>⚠️ 辅助为主，人定 macro/pin</td></tr>
+      <tr><td class="col-num">2</td><td>Power Planning</td><td><span class="tag ok">中-高</span></td><td><span class="tag warn">中</span></td><td>✅ 模板化，参数可调</td></tr>
+      <tr><td class="col-num">3</td><td>Placement</td><td><span class="tag ok">高</span></td><td><span class="tag warn">中</span></td><td>✅ 自动 + 人看 congestion</td></tr>
+      <tr><td class="col-num">4</td><td>CTS</td><td><span class="tag ok">中-高</span></td><td><span class="tag warn">中</span></td><td>✅ 自动 + 人定 spec</td></tr>
+      <tr><td class="col-num">5</td><td>Routing</td><td><span class="tag ok">高</span></td><td><span class="tag warn">低-中</span></td><td>✅ 自动，人看 DRC 收敛</td></tr>
+      <tr><td class="col-num">6</td><td>Timing ECO</td><td><span class="tag warn">中</span></td><td><span class="tag err">高</span></td><td>⚠️ 自动跑 + 人定策略</td></tr>
+      <tr><td class="col-num">7</td><td>Signoff</td><td><span class="tag warn">中</span></td><td><span class="tag err">高</span></td><td>⚠️ 自动跑工具，人判 waiver</td></tr>
+      <tr><td class="col-num">8</td><td>Tapeout</td><td><span class="tag ok">高</span></td><td><span class="tag err">高</span></td><td>❌ 人工把关</td></tr>
+    </tbody>
+  </table>
+  <div class="lead">
+    <b>结论：</b>macro/pin 摆放（#1）和 timing ECO（#6）是判断权重最高的两段，agent 应在这两处显式停下来请人确认；
+    其余高可脚本化的 stage 适合 agent 自动推进，人只看关键报告（congestion / DRC / timing）。
+    <br><b>Skill 化提示：</b>详细表中 <span class="tag ok">✅ 机械</span> 的步骤坍缩成两个横切 skill 家族——
+    知识类（已有 <code>search-eda-command</code> 等）与动作类（缺 <code>parse-eda-report</code> + <code>run-eda-script</code>，价值最大）。
+  </div>
+</section>
+
+<!-- ============ 对照本系统 ============ -->
+<section id="map">
+  <h2>对照本系统当前建模</h2>
+  <p>本系统 orchestrator 目前把 9 个工业 stage 精简为 <b>3 个流水线 stage + 2 个特殊角色</b>。</p>
+  <table>
+    <thead>
+      <tr><th>本系统</th><th>类型</th><th>覆盖的工业 stage</th><th>备注</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>spec</code></td><td><span class="tag info">人工审批阶段</span></td><td>—</td><td>SPEC_REVIEW，不在 stages 流水线里</td></tr>
+      <tr><td><code>floorplan</code></td><td><span class="tag">流水线 stage</span></td><td>#0 Import + #1 Floorplan + #2 Power + #3 Placement</td><td><span class="tag warn">偏粗</span> 4 步合并</td></tr>
+      <tr><td><code>cts</code></td><td><span class="tag">流水线 stage</span></td><td>#4 CTS</td><td>—</td></tr>
+      <tr><td><code>route</code></td><td><span class="tag">流水线 stage</span></td><td>#5 Routing</td><td>—</td></tr>
+      <tr><td><code>timing-eco</code></td><td><span class="tag info">按需 agent</span></td><td>#6 Timing Closure</td><td>可在任意 stage 后派发</td></tr>
+      <tr><td><span class="tag err">缺</span></td><td>—</td><td>#7 Signoff（含 RC 抽取/SPEF）</td><td>termination_criteria 已声明但无对应 stage</td></tr>
+      <tr><td><span class="tag err">缺</span></td><td>—</td><td>#8 Tapeout</td><td>可能有意排除在自动流程外</td></tr>
+    </tbody>
+  </table>
+  <div class="lead">
+    <b>两点建议：</b><br>
+    ① 把 <code>placement</code> 从 floorplan 拆出来做独立 stage——它有自己的 gate（congestion、pre-CTS timing），失败时可独立 retry 而不连累 macro 摆放。<br>
+    ② 补一个 <code>signoff</code> stage（含 RC 抽取/SPEF），让 <code>termination_criteria</code> 里的 timing/DRC 目标有真正的 gate 守着。<br>
+    建议目标流水线：<code>floorplan → placement → cts → route → signoff</code>。
+  </div>
+</section>
+
+</main>
+
+<footer>
+  芯片后端设计全流程参考 · 命令以 Cadence Innovus 为例（PrimeTime / Calibre / Voltus / StarRC 为对应签核工具）· 生成于 chip-backend-ai
+</footer>
+
+<script>
+  const tabs = document.querySelectorAll('nav.tabs button');
+  const sections = document.querySelectorAll('main section');
+  tabs.forEach(btn => btn.addEventListener('click', () => {
+    tabs.forEach(b => b.classList.remove('active'));
+    sections.forEach(s => s.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+    window.scrollTo({top:0, behavior:'smooth'});
+  }));
+</script>
+</body>
+</html>

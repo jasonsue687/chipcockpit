@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 后端设计流程 · 架构与节点开发指引</title>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#1e293b; --panel2:#273449; --line:#334155;
+    --text:#e2e8f0; --muted:#94a3b8; --accent:#38bdf8; --accent2:#22d3ee;
+    --design:#a78bfa; --mech:#38bdf8; --measure:#22c55e; --human:#f59e0b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"Segoe UI",Helvetica,"PingFang SC","Microsoft YaHei",sans-serif;
+       background:var(--bg);color:var(--text);line-height:1.55}
+  header{padding:28px 40px;background:linear-gradient(135deg,#0b1224 0%,#172554 100%);border-bottom:1px solid var(--line)}
+  header h1{margin:0;font-size:23px}
+  header p{margin:8px 0 0;color:var(--muted);font-size:13.5px;max-width:1100px}
+  header p b{color:var(--accent)}
+  nav.tabs{display:flex;flex-wrap:wrap;gap:6px;padding:14px 40px;background:#0b1224;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+  nav.tabs button{background:transparent;color:var(--muted);border:1px solid transparent;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-family:inherit}
+  nav.tabs button:hover{color:var(--text);background:#1e293b}
+  nav.tabs button.active{color:var(--accent);background:#0f1f3a;border-color:var(--accent)}
+  main{padding:26px 40px}
+  section{display:none;animation:fade .25s ease}
+  section.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  h2{font-size:20px;border-left:4px solid var(--accent);padding-left:12px;margin-top:0}
+  h3{font-size:16px;color:var(--accent2);margin-top:28px}
+  p{color:#cbd5e1}
+  code{font-family:"SF Mono",Consolas,monospace;color:#fbbf24;font-size:12.5px}
+  table{width:100%;border-collapse:collapse;margin:8px 0 22px;font-size:13px}
+  th,td{padding:8px 11px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  th{background:#0b1224;color:var(--accent2);font-weight:600}
+  tr:hover td{background:#1a2540}
+  .lead{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 20px;margin:16px 0}
+  .lead b{color:var(--accent)}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;margin:12px 0;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:11px 16px;font-size:12.5px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+  .tag{display:inline-block;font-size:9.5px;padding:1px 7px;border-radius:8px;font-weight:700}
+  .tag.design{background:#4c1d95;color:#ddd6fe}
+  .tag.mech{background:#0c4a6e;color:#bae6fd}
+  .tag.measure{background:#14532d;color:#bbf7d0}
+  .tag.human{background:#78350f;color:#fde68a}
+  .gate{display:inline-block;font-size:9px;padding:1px 6px;border-radius:7px;background:#14532d;color:#bbf7d0;font-weight:700;letter-spacing:.5px}
+  .pill{display:inline-block;font-size:9.5px;padding:1px 6px;border-radius:7px;font-weight:600}
+  .pill.built{background:#14532d;color:#bbf7d0}
+  .pill.todo{background:#7c2d12;color:#fed7aa}
+  .pill.shared{background:#0c4a6e;color:#bae6fd}
+
+  /* ---- swimlane board: 横向 = stage, 纵向 = nodes ---- */
+  .board-scroll{overflow-x:auto;padding:6px 0 22px}
+  .board{display:flex;gap:0;min-width:min-content;align-items:flex-start}
+  .lane{flex:0 0 256px;width:256px;min-width:0;padding:0 11px;border-right:1px dashed var(--line)}
+  .lane:last-child{border-right:none}
+  .lane-head{background:#0b1224;border:1px solid var(--accent);border-radius:9px;
+             padding:9px 8px;text-align:center;margin-bottom:18px}
+  .lane-head .num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;
+                  background:#0f1f3a;border:1.5px solid var(--accent);color:var(--accent);font-size:12px;font-weight:700;margin-bottom:4px}
+  .lane-head b{display:block;font-size:13px;color:var(--accent)}
+  .lane-head em{font-size:11px;color:var(--muted);font-style:normal}
+  .step-card{background:#0b1224;border:1px solid var(--line);border-left:3px solid var(--mech);border-radius:7px;
+             padding:9px 11px;margin-bottom:22px;position:relative}
+  .step-card.t-design{border-left-color:var(--design)}
+  .step-card.t-mech{border-left-color:var(--mech)}
+  .step-card.t-measure{border-left-color:var(--measure)}
+  .step-card.t-human{border-left-color:var(--human)}
+  .step-card:not(:last-child)::after{content:"▼";position:absolute;bottom:-16px;left:50%;transform:translateX(-50%);
+             color:#475569;font-size:11px}
+  .sc-name{font-family:"SF Mono",Consolas,monospace;font-size:12px;color:#f1f5f9;font-weight:600;
+           display:flex;align-items:center;gap:6px;flex-wrap:wrap;overflow-wrap:anywhere}
+  .sc-dec{font-size:11px;line-height:1.5;margin:6px 0 8px;overflow-wrap:anywhere}
+  .t-design .sc-dec{color:#ddd6fe}
+  .t-mech .sc-dec,.t-measure .sc-dec,.t-human .sc-dec{color:#94a3b8}
+  .sc-dec .k{color:#c4b5fd;font-weight:600}
+  .sc-io{font-size:10.5px;color:var(--muted);font-family:"SF Mono",Consolas,monospace;line-height:1.5;overflow-wrap:anywhere}
+  .io-tag{display:inline-block;width:24px;font-weight:700;font-family:inherit}
+  .io-tag.in{color:#7dd3fc}.io-tag.out{color:#86efac}
+
+  /* ---- node anatomy diagram ---- */
+  .anatomy{display:flex;flex-wrap:wrap;gap:26px;align-items:flex-start;margin:18px 0}
+  .pipe{flex:1 1 360px;min-width:320px}
+  .node-row{display:flex;align-items:flex-start;gap:12px;margin-bottom:10px}
+  .node-step{flex:0 0 300px;background:#0b1224;border:1px solid var(--line);border-radius:9px;padding:11px 14px}
+  .node-step .t{font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px}
+  .node-step .d{font-size:12px;color:var(--muted);margin-top:4px}
+  .node-step.s1{border-left:4px solid var(--design)}
+  .node-step.s2,.node-step.s3,.node-step.s4{border-left:4px solid var(--mech)}
+  .node-side{flex:1 1 auto;font-size:11.5px;color:#94a3b8;padding-top:10px}
+  .node-side b{color:#cbd5e1}
+  .down{color:#475569;font-size:14px;margin:0 0 8px 24px}
+  .loopback{font-size:11.5px;color:var(--human);margin:6px 0 0 6px}
+
+  .flowline{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:12px 0;font-family:"SF Mono",Consolas,monospace;font-size:12px}
+  .flowline .n{background:#0b1224;border:1px solid var(--line);border-radius:6px;padding:5px 9px;color:#cbd5e1}
+  .flowline .a{color:var(--accent)}
+  .fname{color:#cbd5e1;font-family:"SF Mono",Consolas,monospace;font-size:11.5px}
+  pre{background:#0b1224;border:1px solid var(--line);border-radius:8px;padding:13px 15px;overflow:auto;font-size:12px;color:#cbd5e1;line-height:1.5}
+  ol.recipe{counter-reset:r;list-style:none;padding-left:0}
+  ol.recipe li{position:relative;padding:10px 0 10px 42px;border-bottom:1px solid var(--line)}
+  ol.recipe li::before{counter-increment:r;content:counter(r);position:absolute;left:0;top:9px;width:26px;height:26px;
+       border-radius:50%;background:#0f1f3a;border:1.5px solid var(--accent);color:var(--accent);font-weight:700;
+       display:flex;align-items:center;justify-content:center;font-size:12px}
+  ol.recipe li b{color:#e2e8f0}
+  .redline{background:#1a1414;border:1px solid #7c2d12;border-radius:8px;padding:6px 14px;margin:6px 0}
+  .redline li{margin:7px 0;color:#fecaca;font-size:13px}
+  .lane-head .skills{display:block;margin-top:5px;font-size:10px;color:#c4b5fd;background:#1e1b4b;border-radius:6px;padding:2px 4px;font-weight:600}
+  .lane-head .skills.zero{color:#64748b;background:#0f172a;font-weight:400}
+  .sc-skill{margin:5px 0 4px;font-size:10px;color:#94a3b8}
+  .skill-badge{display:inline-block;font-size:10px;padding:1px 7px;border-radius:8px;background:#312e81;color:#c7d2fe;font-family:"SF Mono",Consolas,monospace;font-weight:600}
+  .sc-list{font-size:11px;color:#bae6fd;font-family:"SF Mono",Consolas,monospace;line-height:1.85;margin:6px 0 2px}
+  .sc-note{font-size:9.5px;color:#64748b;margin-top:6px;font-style:italic;line-height:1.4}
+  /* ---- spec band: 总需求 → AI 扇出 → 向下映射到各 stage ---- */
+  .spec-band{min-width:min-content}
+  .spec-origin{display:flex;align-items:center;gap:9px;flex-wrap:wrap;background:linear-gradient(90deg,#1e1b4b,#0b1224);border:1px solid var(--design);border-radius:9px;padding:10px 14px;margin:0 11px 12px;font-size:12px;color:#ddd6fe}
+  .spec-origin .o-tag{font-weight:700;color:var(--design)}
+  .spec-origin .o-step{background:#0b1224;border:1px solid var(--line);border-radius:7px;padding:5px 10px}
+  .spec-origin .o-step.o-ai{border-color:var(--design);color:#ddd6fe}
+  .spec-origin .o-arrow{color:var(--design);font-weight:700}
+  .spec-origin .o-note{color:#64748b;font-size:11px}
+  .spec-row{display:flex;gap:0;margin-bottom:26px}
+  .spec-cell{flex:0 0 256px;width:256px;padding:0 11px}
+  .spec-card{background:#0b1224;border:1px dashed var(--line);border-radius:7px;padding:7px 9px;position:relative}
+  .spec-card.budget{border:1px solid var(--design)}
+  .spec-card .sf{font-family:"SF Mono",Consolas,monospace;color:#c7d2fe;font-weight:600;font-size:11px;overflow-wrap:anywhere}
+  .spec-card .sk{color:#94a3b8;margin-top:4px;line-height:1.45;font-size:10px;overflow-wrap:anywhere}
+  .spec-card::after{content:"↓";position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);color:var(--design);font-size:15px;font-weight:700}
+  .spec-refine{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#0b1224;border:1px dashed var(--design);border-radius:9px;padding:9px 14px;margin:0 11px 6px;font-size:12px;color:#cbd5e1}
+  .spec-refine .r-icon{font-weight:700;color:var(--design);white-space:nowrap}
+  .spec-refine .r-body b{color:#ddd6fe}
+  .spec-refine .r-down{color:#64748b;font-size:11px}
+  /* ---- foundation band ---- */
+  .foundation-band{background:#0b1224;border:1px solid var(--line);border-top:2px solid var(--accent2);border-radius:9px;padding:12px 16px;margin:6px 0 14px}
+  .foundation-band .f-title{font-weight:700;color:var(--accent2);font-size:13px;margin-bottom:9px}
+  .foundation-band .f-cards{display:flex;gap:14px;flex-wrap:wrap}
+  .foundation-band .f-card{flex:1 1 340px;background:#0f1f3a;border:1px solid var(--line);border-radius:8px;padding:9px 13px}
+  .foundation-band .fc-h{font-weight:600;color:#e2e8f0;font-size:12.5px;margin-bottom:5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .foundation-band .fc-b{font-size:11.5px;color:#94a3b8;line-height:1.55}
+  .foundation-band .f-up{color:#64748b;font-size:11px;margin-top:9px}
+  footer{padding:24px 40px;color:var(--muted);font-size:12px;border-top:1px solid var(--line)}
+</style>
+</head>
+<body>
+<header>
+  <h1>AI 后端设计流程 · 架构与节点开发指引</h1>
+  <p>顶部 <b>Spec 层（Phase 0）</b>把一份总需求（PPA 目标 / 自然语言）经 AI 分析<b>扇出成各 stage 的约束并向下映射</b>；其下横向 = 9 个 stage，纵向 = 每个 stage 的<b>节点</b>（标注该节点的 AI 决策点 / 输入 / 输出）。本图是<b>流程架构设计</b>，
+     用于指导同事按节点开发各步的 AI 能力（<b>判断由决策 playbook skill 承接、主 agent 执行，无 sub-agent</b>）。<b>横切的执行/解析能力</b>（run-eda-script、render-tcl、parse-eda-report）单列在「共享能力」页，<b>不在节点上逐个重复</b>。</p>
+</header>
+
+<nav class="tabs">
+  <button class="active" data-tab="board">流程看板 (横 stage × 纵 节点)</button>
+  <button data-tab="spec">Spec 层 (Phase 0)</button>
+  <button data-tab="anatomy">节点架构 (每个节点怎么构成)</button>
+  <button data-tab="devguide">节点开发指引 (给同事)</button>
+  <button data-tab="shared">共享能力 &amp; 数据流</button>
+</nav>
+
+<main>
+
+<!-- ============ 流程看板 ============ -->
+<section id="board" class="active">
+  <h2>流程看板 — 横向 9 stage · 纵向各节点（AI 视角）</h2>
+  <div class="legend">
+    <span><span class="tag design">AI 决策</span> AI 决策步：标了实现它的 <span class="skill-badge">skill 名</span></span>
+    <span><span class="tag mech">自动执行</span> 自动执行：合并成 1 卡 · 模板化脚本</span>
+    <span><span class="tag measure">自动校验</span> 自动校验/质量门</span>
+    <span><span class="tag human">人工确认</span> 人工 gate</span>
+    <span><span class="gate">GATE</span> 阶段质量门</span>
+    <span style="color:#64748b">lane 头标该 stage 的决策 skill 数 · ← 左右滚动 →</span>
+  </div>
+  <p style="font-size:12.5px;color:#94a3b8;margin-top:-2px">
+    <b style="color:#ddd6fe">AI 决策步</b>逐个标出实现它的 skill（一个 stage 可能 1 个或多个 skill，见 lane 头计数）；<b style="color:#bae6fd">自动执行</b>能用模板化脚本搞定，按 stage 合并成一张卡、只列步骤名；横切的 render-tcl / run-eda-script / parse-eda-report 见「共享能力」页。<b style="color:#c4b5fd">顶部 spec 带</b>把一份总需求经 AI 分析扇出成 N 份 stage spec、向下映射到各 stage（紫框=PPA 预算型、灰框=PDK 加载型）；每个 stage 读它那份喂给三类节点（详见「Spec 层」页）。<b style="color:#a5f3fc">基座信息</b>（env 工具 / EDA KB / 工艺 PDK）贯穿支撑见底部；<b style="color:#c7d2fe">输入信息</b>（设计数据）从 import 进、随流程流动。<b style="color:#a5f3fc">env/工具</b>是机器级一次性 bootstrap（<code>env_manager</code>，见底部基座带）；<b style="color:#c7d2fe">输入齐不齐 + 版本一致</b>在 <code>import</code> 头部检查（flow_loader <code>blocked_inputs</code> ＋ <code>version-check</code> skill）。
+  </p>
+
+  <div class="board-scroll">
+
+  <!-- spec 层：总需求 → AI 扇出 N 份 stage spec → 向下映射到各 stage -->
+  <div class="spec-band">
+    <div class="spec-origin">
+      <span class="o-tag">📋 Spec 层 · Phase 0（在流程之上）</span>
+      <span class="o-step">总需求：PPA 目标 / 自然语言</span>
+      <span class="o-arrow">─▶</span>
+      <span class="o-step o-ai">spec-draft（AI 分析）</span>
+      <span class="o-arrow">─▶</span>
+      <span class="o-step">人工审批 SPEC_REVIEW</span>
+      <span class="o-arrow">扇出 ▼</span>
+      <span class="o-note">扇出 N 份 <b style="color:#ddd6fe">初版</b> stage spec（Phase 0 粗预算）</span>
+    </div>
+    <div class="spec-row">
+      <div class="spec-cell"><div class="spec-card"><div class="sf">import.yaml</div><div class="sk">全局 tech/corner/库路径（加载型）</div></div></div>
+      <div class="spec-cell"><div class="spec-card budget"><div class="sf">floorplan.yaml</div><div class="sk">util 目标 · channel（PPA 预算）</div></div></div>
+      <div class="spec-cell"><div class="spec-card budget"><div class="sf">powerplan.yaml</div><div class="sk">IR / EM 预算（PPA 预算）</div></div></div>
+      <div class="spec-cell"><div class="spec-card budget"><div class="sf">placement.yaml</div><div class="sk">congestion / pre-CTS 检查点</div></div></div>
+      <div class="spec-cell"><div class="spec-card budget"><div class="sf">cts.yaml</div><div class="sk">skew / insertion 目标</div></div></div>
+      <div class="spec-cell"><div class="spec-card budget"><div class="sf">route.yaml</div><div class="sk">DRC / timing 检查点</div></div></div>
+      <div class="spec-cell"><div class="spec-card budget"><div class="sf">timing_eco.yaml</div><div class="sk">WNS / TNS / hold 目标</div></div></div>
+      <div class="spec-cell"><div class="spec-card"><div class="sf">signoff.yaml</div><div class="sk">DRC/LVS/IR/EM（多为 PDK deck）</div></div></div>
+      <div class="spec-cell"><div class="spec-card"><div class="sf">tapeout.yaml</div><div class="sk">GDS / checklist（全局）</div></div></div>
+    </div>
+    <div class="spec-refine">
+      <span class="r-icon">⟳ 进 stage 时 just-in-time 细化</span>
+      <span class="r-body">本 stage <b>初版 spec</b> ＋ <b>上游已积累的真实信息</b>（actual/拥塞/skew…）＋ <b>人工补充输入</b> ─▶ 本 stage <b>最终 spec</b></span>
+      <span class="r-down">↓ 各 stage 进场读「最终 spec」再喂三类节点</span>
+    </div>
+  </div>
+
+  <div class="board">
+
+    <!-- 0 import -->
+    <div class="lane">
+      <div class="lane-head"><span class="num">0</span><b>import</b><em>数据准备</em><span class="skills zero">0 决策 skill · 全模板</span></div>
+      <div class="step-card t-measure"><div class="sc-name">数据就绪 <span class="tag measure">前置检查</span></div>
+        <div class="sc-dec">输入齐全：flow_loader <code>blocked_inputs</code> 逐文件查（缺→人工补）<br>版本一致：netlist·SDC·lib·PDK 同 release（<code>version-check</code> skill 步）</div>
+        <div class="sc-io"><span class="io-tag in">in</span> input manifest</div><div class="sc-io"><span class="io-tag out">out</span> 齐 ✓ / blocked</div>
+        <div class="sc-note">"前置就绪"的数据那半落这里；env/工具是机器级 bootstrap（见基座带）</div></div>
+      <div class="step-card t-mech"><div class="sc-name">自动执行 <span class="tag mech">模板化脚本</span></div>
+        <div class="sc-list">• read_design<br>• setup_mmmc<br>• global_net_connect<br>• check_design</div>
+        <div class="sc-io"><span class="io-tag in">in</span> netlist·SDC·UPF·scan · LEF·多corner库</div><div class="sc-io"><span class="io-tag out">out</span> import_done.db · check_design.rpt</div>
+        <div class="sc-note">render-tcl + run-eda-script，参数来自 spec，跨项目复用</div></div>
+      <div class="step-card t-measure"><div class="sc-name">import_eval <span class="gate">GATE</span></div>
+        <div class="sc-dec">导入质量门：库/约束完整性 → eval_result</div>
+        <div class="sc-io"><span class="io-tag in">in</span> check_design.rpt</div><div class="sc-io"><span class="io-tag out">out</span> eval_result.yaml</div></div>
+    </div>
+
+    <!-- 1 floorplan -->
+    <div class="lane">
+      <div class="lane-head"><span class="num">1</span><b>floorplan</b><em>布局规划</em><span class="skills">3 决策 skill</span></div>
+      <div class="step-card t-design"><div class="sc-name">gen_floorplan <span class="tag design">AI 决策</span></div>
+        <div class="sc-skill">由 skill <span class="skill-badge">floorplan-plan</span></div>
+        <div class="sc-dec"><span class="k">决策：</span>die/core 尺寸 · aspect ratio · utilization</div>
+        <div class="sc-io"><span class="io-tag in">in</span> import_done.db</div><div class="sc-io"><span class="io-tag out">out</span> fp_init.def</div></div>
+      <div class="step-card t-design"><div class="sc-name">place_io_pins <span class="tag design">AI 决策</span></div>
+        <div class="sc-skill">由 skill <span class="skill-badge">floorplan-io-pins</span></div>
+        <div class="sc-dec"><span class="k">决策：</span>IO pin 摆位/分组（block）或 pad ring（top）</div>
+        <div class="sc-io"><span class="io-tag in">in</span> fp_init.def</div><div class="sc-io"><span class="io-tag out">out</span> fp_pins.def</div></div>
+      <div class="step-card t-design"><div class="sc-name">macro_placement <span class="tag design">AI 决策</span></div>
+        <div class="sc-skill">由 skill <span class="skill-badge">floorplan-macro</span></div>
+        <div class="sc-dec"><span class="k">决策：</span>macro 摆位 / 朝向 / channel（依数据流）</div>
+        <div class="sc-io"><span class="io-tag in">in</span> fp_pins.def</div><div class="sc-io"><span class="io-tag out">out</span> fp_macro.def</div></div>
+      <div class="step-card t-human"><div class="sc-name">confirm_macro <span class="tag human">人工确认</span></div>
+        <div class="sc-dec">人工确认 macro/pin 摆放合理</div>
+        <div class="sc-io"><span class="io-tag in">in</span> fp_macro.def</div><div class="sc-io"><span class="io-tag out">out</span> 确认 / 调整</div></div>
+      <div class="step-card t-design"><div class="sc-name">add_blockage <span class="tag design">AI 决策</span></div>
+        <div class="sc-skill">由 skill <span class="skill-badge">floorplan-macro</span><span style="color:#475569"> (同上)</span></div>
+        <div class="sc-dec"><span class="k">决策：</span>halo / placement blockage / voltage area</div>
+        <div class="sc-io"><span class="io-tag in">in</span> fp_macro.def</div><div class="sc-io"><span class="io-tag out">out</span> floorplan.def</div></div>
+      <div class="step-card t-measure"><div class="sc-name">floorplan_eval <span class="gate">GATE</span></div>
+        <div class="sc-dec">质量门：utilization / channel → eval_result</div>
+        <div class="sc-io"><span class="io-tag in">in</span> floorplan.def</div><div class="sc-io"><span class="io-tag out">out</span> eval_result.yaml</div></div>
+    </div>
+
+    <!-- 2 powerplan -->
+    <div class="lane">
+      <div class="lane-head"><span class="num">2</span><b>powerplan</b><em>电源规划</em><span class="skills">1 决策 skill</span></div>
+      <div class="step-card t-design"><div class="sc-name">gen_power_plan <span class="tag design">AI 决策</span></div>
+        <div class="sc-skill">由 skill <span class="skill-badge">powerplan-design</span></div>
+        <div class="sc-dec"><span class="k">决策：</span>ring/stripe 宽度·间距·pitch · sroute 策略（IR/EM 权衡）</div>
+        <div class="sc-io"><span class="io-tag in">in</span> floorplan.def</div><div class="sc-io"><span class="io-tag out">out</span> power_plan.tcl</div></div>
+      <div class="step-card t-mech"><div class="sc-name">自动执行 <span class="tag mech">模板化脚本</span></div>
+        <div class="sc-list">• run_power_plan<br>• insert_tap_decap<br>• early_ir</div>
+        <div class="sc-io"><span class="io-tag in">in</span> power_plan.tcl</div><div class="sc-io"><span class="io-tag out">out</span> pg_full.def · ir.rpt</div>
+        <div class="sc-note">render-tcl + run-eda-script</div></div>
+      <div class="step-card t-measure"><div class="sc-name">power_eval <span class="gate">GATE</span></div>
+        <div class="sc-dec">质量门：IR drop / 连通性 → eval_result</div>
+        <div class="sc-io"><span class="io-tag in">in</span> ir.rpt</div><div class="sc-io"><span class="io-tag out">out</span> eval_result.yaml</div></div>
+    </div>
+
+    <!-- 3 placement -->
+    <div class="lane">
+      <div class="lane-head"><span class="num">3</span><b>placement</b><em>标准单元布局</em><span class="skills">1 决策 skill</span></div>
+      <div class="step-card t-design"><div class="sc-name">place_opt <span class="tag design">AI 决策</span></div>
+        <div class="sc-skill">由 skill <span class="skill-badge">placement-design</span></div>
+        <div class="sc-dec"><span class="k">决策：</span>util margin · congestion 驱动选项 · HFNS · tie cell</div>
+        <div class="sc-io"><span class="io-tag in">in</span> pg_full.def</div><div class="sc-io"><span class="io-tag out">out</span> placed.def</div></div>
+      <div class="step-card t-mech"><div class="sc-name">自动执行 <span class="tag mech">模板化脚本</span></div>
+        <div class="sc-list">• scan_reorder</div>
+        <div class="sc-io"><span class="io-tag in">in</span> placed.def</div><div class="sc-io"><span class="io-tag out">out</span> placed_scan.def</div>
+        <div class="sc-note">render-tcl + run-eda-script</div></div>
+      <div class="step-card t-measure"><div class="sc-name">congestion_analysis <span class="tag measure">自动校验</span></div>
+        <div class="sc-dec">Trial route 拥塞分析（非 gate）</div>
+        <div class="sc-io"><span class="io-tag in">in</span> placed_scan.def</div><div class="sc-io"><span class="io-tag out">out</span> congestion.rpt</div></div>
+      <div class="step-card t-measure"><div class="sc-name">placement_eval <span class="gate">GATE</span></div>
+        <div class="sc-dec">质量门：congestion / pre-CTS timing → eval_result</div>
+        <div class="sc-io"><span class="io-tag in">in</span> congestion.rpt</div><div class="sc-io"><span class="io-tag out">out</span> eval_result.yaml</div></div>
+    </div>
+
+    <!-- 4 cts -->
+    <div class="lane">
+      <div class="lane-head"><span class="num">4</span><b>cts</b><em>时钟树综合</em><span class="skills">1 决策 skill</span></div>
+      <div class="step-card t-design"><div class="sc-name">gen_cts_spec <span class="tag design">AI 决策</span></div>
+        <div class="sc-skill">由 skill <span class="skill-badge">cts-design</span></div>
+        <div class="sc-dec"><span class="k">决策：</span>target skew · NDR · leaf cell · skew group · exclude pin</div>
+        <div class="sc-io"><span class="io-tag in">in</span> placed_scan.def</div><div class="sc-io"><span class="io-tag out">out</span> cts.spec</div></div>
+      <div class="step-card t-mech"><div class="sc-name">自动执行 <span class="tag mech">模板化脚本</span></div>
+        <div class="sc-list">• build_clock_tree<br>• postcts_opt</div>
+        <div class="sc-io"><span class="io-tag in">in</span> cts.spec</div><div class="sc-io"><span class="io-tag out">out</span> cts_opt.def · clock_tree.rpt</div>
+        <div class="sc-note">render-tcl + run-eda-script</div></div>
+      <div class="step-card t-measure"><div class="sc-name">cts_eval <span class="gate">GATE</span></div>
+        <div class="sc-dec">质量门：skew / insertion delay → eval_result</div>
+        <div class="sc-io"><span class="io-tag in">in</span> clock_tree.rpt</div><div class="sc-io"><span class="io-tag out">out</span> eval_result.yaml</div></div>
+    </div>
+
+    <!-- 5 route -->
+    <div class="lane">
+      <div class="lane-head"><span class="num">5</span><b>route</b><em>布线</em><span class="skills">2 决策 skill</span></div>
+      <div class="step-card t-design"><div class="sc-name">global_route <span class="tag design">AI 决策</span></div>
+        <div class="sc-skill">由 skill <span class="skill-badge">route-strategy</span></div>
+        <div class="sc-dec"><span class="k">决策：</span>层分配 · NDR · shielding（关键/时钟网）</div>
+        <div class="sc-io"><span class="io-tag in">in</span> cts_opt.def</div><div class="sc-io"><span class="io-tag out">out</span> groute.def</div></div>
+      <div class="step-card t-design"><div class="sc-name">detail_route <span class="tag design">AI 决策</span></div>
+        <div class="sc-skill">由 skill <span class="skill-badge">route-strategy</span><span style="color:#475569"> (同上)</span></div>
+        <div class="sc-dec"><span class="k">决策：</span>NanoRoute 选项 · post-route 优化档位</div>
+        <div class="sc-io"><span class="io-tag in">in</span> groute.def</div><div class="sc-io"><span class="io-tag out">out</span> routed.def</div></div>
+      <div class="step-card t-design"><div class="sc-name">drc_repair <span class="tag design">AI 决策</span></div>
+        <div class="sc-skill">由 skill <span class="skill-badge">route-drc-repair</span></div>
+        <div class="sc-dec"><span class="k">决策：</span>修哪些 DRC/antenna · 怎么修（search&amp;repair / 冗余 via）</div>
+        <div class="sc-io"><span class="io-tag in">in</span> routed.def</div><div class="sc-io"><span class="io-tag out">out</span> routed_clean.def · drc.rpt</div></div>
+      <div class="step-card t-measure"><div class="sc-name">route_eval <span class="gate">GATE</span></div>
+        <div class="sc-dec">质量门：DRC / open / timing → eval_result</div>
+        <div class="sc-io"><span class="io-tag in">in</span> drc.rpt</div><div class="sc-io"><span class="io-tag out">out</span> eval_result.yaml</div></div>
+    </div>
+
+    <!-- 6 timing_eco -->
+    <div class="lane">
+      <div class="lane-head"><span class="num">6</span><b>timing_eco</b><em>时序收敛/ECO</em><span class="skills">1 决策 skill</span></div>
+      <div class="step-card t-mech"><div class="sc-name">自动执行 <span class="tag mech">模板化脚本</span></div>
+        <div class="sc-list">• extract_rc<br>• signoff_sta</div>
+        <div class="sc-io"><span class="io-tag in">in</span> routed_clean.def</div><div class="sc-io"><span class="io-tag out">out</span> design.spef · timing.rpt</div>
+        <div class="sc-note">render-tcl + run-eda-script</div></div>
+      <div class="step-card t-design"><div class="sc-name">fix_strategy <span class="tag design">AI 决策</span></div>
+        <div class="sc-skill">由 skill <span class="skill-badge">timing-eco-design</span></div>
+        <div class="sc-dec"><span class="k">决策：</span>修哪条路 · 手段（buffer / resize / useful skew / 重布）</div>
+        <div class="sc-io"><span class="io-tag in">in</span> timing.rpt</div><div class="sc-io"><span class="io-tag out">out</span> eco.changes</div></div>
+      <div class="step-card t-mech"><div class="sc-name">自动执行 <span class="tag mech">模板化脚本</span></div>
+        <div class="sc-list">• apply_eco</div>
+        <div class="sc-io"><span class="io-tag in">in</span> eco.changes · routed_clean.def</div><div class="sc-io"><span class="io-tag out">out</span> eco.def · eco_timing.rpt</div>
+        <div class="sc-note">render-tcl + run-eda-script</div></div>
+      <div class="step-card t-measure"><div class="sc-name">timing_eval <span class="gate">GATE</span></div>
+        <div class="sc-dec">质量门：WNS / TNS / hold 全 view → eval_result</div>
+        <div class="sc-io"><span class="io-tag in">in</span> eco_timing.rpt</div><div class="sc-io"><span class="io-tag out">out</span> eval_result.yaml</div></div>
+    </div>
+
+    <!-- 7 signoff -->
+    <div class="lane">
+      <div class="lane-head"><span class="num">7</span><b>signoff</b><em>物理验证</em><span class="skills zero">0 决策 skill · 模板+人工</span></div>
+      <div class="step-card t-mech"><div class="sc-name">自动执行 <span class="tag mech">模板化脚本</span></div>
+        <div class="sc-list">• metal_fill<br>• signoff_drc_lvs<br>• signoff_ir_em</div>
+        <div class="sc-io"><span class="io-tag in">in</span> eco.def</div><div class="sc-io"><span class="io-tag out">out</span> filled.def · drc_lvs.rpt · ir_em.rpt</div>
+        <div class="sc-note">render-tcl + run-eda-script（规则来自 PDK deck）</div></div>
+      <div class="step-card t-human"><div class="sc-name">waiver_review <span class="tag human">人工确认</span></div>
+        <div class="sc-dec">人工 review violation 并判定 waiver</div>
+        <div class="sc-io"><span class="io-tag in">in</span> drc_lvs.rpt · ir_em.rpt</div><div class="sc-io"><span class="io-tag out">out</span> waiver 判定</div></div>
+      <div class="step-card t-measure"><div class="sc-name">signoff_eval <span class="gate">GATE</span></div>
+        <div class="sc-dec">质量门：DRC/LVS clean · IR/EM 达标 → eval_result</div>
+        <div class="sc-io"><span class="io-tag in">in</span> drc_lvs.rpt</div><div class="sc-io"><span class="io-tag out">out</span> eval_result.yaml</div></div>
+    </div>
+
+    <!-- 8 tapeout -->
+    <div class="lane">
+      <div class="lane-head"><span class="num">8</span><b>tapeout</b><em>GDS 交付</em><span class="skills zero">0 决策 skill · 模板+人工</span></div>
+      <div class="step-card t-mech"><div class="sc-name">自动执行 <span class="tag mech">模板化脚本</span></div>
+        <div class="sc-list">• chip_finishing<br>• streamout</div>
+        <div class="sc-io"><span class="io-tag in">in</span> filled.def</div><div class="sc-io"><span class="io-tag out">out</span> final.def · chip.gds</div>
+        <div class="sc-note">render-tcl + run-eda-script</div></div>
+      <div class="step-card t-human"><div class="sc-name">final_checklist <span class="tag human">人工确认</span></div>
+        <div class="sc-dec">人工 tapeout checklist 终审</div>
+        <div class="sc-io"><span class="io-tag in">in</span> chip.gds</div><div class="sc-io"><span class="io-tag out">out</span> 交付</div></div>
+    </div>
+
+  </div>
+  </div>
+
+  <div class="foundation-band">
+    <div class="f-title">⏚ 基座（贯穿全流程，被各节点读取）</div>
+    <div class="f-cards">
+      <div class="f-card">
+        <div class="fc-h">环境 / 工具（env）<span class="pill built">已建 env_manager</span></div>
+        <div class="fc-b">机器级 <code>~/.chip-backend-ai/env.json</code> 定位 Innovus 二进制；<b>自动执行 / run-eda-script</b> 调用时按此解析路径。<b>一次性机器 bootstrap</b>（Phase 0：detect → 人工 set → check，<b>跨所有项目共享</b>）；resume 只 <code>check</code> 廉价校验、stale 才重 detect。<b>不 gate spec</b>，只需在 import（首个 EDA 步）前就绪 —— 这就是"前置就绪"的工具那半。</div>
+      </div>
+      <div class="f-card">
+        <div class="fc-h">EDA 知识库（KB）<span class="pill built">已建</span></div>
+        <div class="fc-b"><code>search-eda-command</code>（命令语法 + 防幻觉护栏）· <code>read-expert-doc</code> · <code>read-eda-concept</code> · <code>read-eda-lab-doc</code>；<b>AI 决策</b>读它来正确生成 / 校验该怎么调 EDA 命令。</div>
+      </div>
+      <div class="f-card">
+        <div class="fc-h">工艺 / PDK 数据 <span class="pill built">输入侧配置</span></div>
+        <div class="fc-b">多 corner Liberty · RC tech(QRC/captable) · LEF/metal stack · 特殊单元 · signoff decks(DRC/LVS/antenna) · EM-IR/fill 规则。<b>import 用库、route 用 RC、signoff 用 deck</b> → 相对稳定、贯穿全程。</div>
+      </div>
+    </div>
+    <div class="f-up">↑ 节点站在基座上：自动执行靠 <b>env</b> 找工具、AI 决策靠 <b>KB</b> 知道怎么调命令、import/route/signoff 靠 <b>工艺/PDK</b> 拿库与规则</div>
+  </div>
+
+  <p style="color:var(--muted);font-size:12.5px">
+    每个 stage 末步（GATE）产出 <code>eval_result.yaml</code> 交回状态机判 pass/fail；上一 stage 的产出即下一 stage 首步输入，构成横向流水。
+    <b style="color:#ddd6fe">11 个AI 决策步 → 9 个决策 skill</b>（floorplan 拆 3、route 拆 2，其余各 1）是 AI 开发重点；<b style="color:#bae6fd">自动执行</b>合并为模板化脚本卡；<b style="color:#bbf7d0">质量门</b>共用 parse-eda-report。
+  </p>
+</section>
+
+<!-- ============ Spec 层 ============ -->
+<section id="spec">
+  <h2>Spec 层 — Phase 0：人类需求 → 规格 → 喂给每个 stage</h2>
+  <div class="lead">
+    芯片后端从一份<b>人类主导的需求输入</b>（PPA 目标 + 约束）开始：先结构化成 <code>global_spec.yaml</code>，
+    再把全局 PPA <b>预算分解</b>到每个 stage（<code>spec/stages/&lt;stage&gt;.yaml</code>），人类审批后进入流水线。
+    之后每个 stage 开始时<b>读取它那份 spec</b>，作为只读的"北极星"喂给三类节点。spec 层属于<b>状态机</b>，坐在 <code>flow_definition.yaml</code> 之上。
+  </div>
+
+  <h3>Phase 0 流程（在流水线之前；编排器驱动、状态机记账）</h3>
+  <pre>机器级 bootstrap（流程之外·一次性）：env_manager detect/check 定位 Innovus —— <b>不 gate spec</b>，resume 廉价校验
+══════
+INIT ─human_input─▶ SPEC_DRAFTING ─spec_ready─▶ SPEC_REVIEW ─human_approved─▶ SCHEDULING ─▶ STAGE_RUNNING
+ 人工：写 PPA       AI 决策 (spec-draft playbook)：      人工审批                         (flow_definition.yaml 接管)
+ 目标 + 约束        结构化 global_spec + 派生 per-stage spec
+                                     ◀── human_rejected / revise_spec ──（驳回，或目标不可达时回炉）</pre>
+  <p style="color:#94a3b8;font-size:12.5px;margin-top:-2px"><b style="color:#7dd3fc">"前置就绪"拆两半、各归其位（不再是顶部一道胖闸）：</b>① <b>env/工具</b> = 机器级一次性 bootstrap（<code>env_manager</code>，<b>不 gate spec</b>，resume 廉价校验即可）→ 归底部基座带 env 卡；② <b>输入齐全 + 版本一致</b> = 数据准备 → 归 <code>import</code> 头部（flow_loader <code>blocked_inputs</code> 查存在 ＋ 1 个 <code>version-check</code> skill 步查版本）。原因详见「共享能力」页的取舍说明。</p>
+
+  <h3>① 人类需求输入 → global_spec.yaml（PPA 目标）</h3>
+  <pre>human_goal: "..."            # 人类原始意图（原文保留）
+target_ppa:
+  timing: { wns_ns: -0.1, tns_ns: -1.0, hold_wns_ns: 0.0 }
+  power:  { total_power_mw: null }
+  area:   { utilization_min: 0.60, utilization_max: 0.80 }
+global_constraints: { technology: "tsmc_n5", design_intent: "..." }</pre>
+
+  <h3>② 预算分解：global → 每个 stage 的要求（AI 决策 + 人工确认）</h3>
+  <p>全局 PPA 不能直接套用，要把它"分预算"给各 stage —— 这本身是判断，故由 <span class="skill-badge">spec-draft</span> 决策、人类确认：</p>
+  <table>
+    <thead><tr><th style="width:34%">全局目标</th><th>分解进 stage spec（节选）</th></tr></thead>
+    <tbody>
+      <tr><td>area util 0.60~0.80</td><td>floorplan：utilization 目标 ~0.70 · channel ≥ X</td></tr>
+      <tr><td>timing wns ≤ -0.1ns</td><td>cts：skew/insertion 目标 · route：timing 目标 · timing_eco：收敛余量</td></tr>
+      <tr><td>power 上限</td><td>powerplan：IR/EM 预算 · placement/cts：功耗档位</td></tr>
+    </tbody>
+  </table>
+
+  <div class="lead">
+    <b>两点务必把握（决定 spec 该怎么用）：</b>① 这些 stage spec 是 <b>AI 预测、可重预算的"收敛检查点"</b>，不是 PPA 的硬切分合约——PPA 全流程涌现 + 强耦合，过紧的早期 gate 会造成假失败。② 只<b>分解 PPA 预算型</b>约束（timing/area/power，看板里<b style="color:#ddd6fe">紫框</b>卡）；<b>PDK/方法学固定型</b>约束（DRC/EM/density/corner，灰框卡）一律<b>加载、不由 AI 生成</b>。
+  </div>
+  <h3>两级 spec：Phase 0 初版（粗）→ 进 stage 时细化（细）</h3>
+  <p>Phase 0 信息最少，派生出来的只是<b>初版 / 粗预算</b>。真正喂给某 stage 的 spec，是在<b>该 stage 进场时 just-in-time 生成</b>的：</p>
+  <pre>本 stage 初版 spec（Phase 0）
+      ＋ 上游已积累的真实信息（actual 指标 / 拥塞 / skew / 寄生 …）
+      ＋ 人工补充输入（额外约束 / 偏好）
+      ──spec-draft 细化──▶ 本 stage <b>最终 spec</b> ──▶ 喂该 stage 三类节点</pre>
+  <p style="color:#94a3b8;font-size:12.5px">这就是"<b style="color:#cbd5e1">滚动细化 rolling-wave</b>"：开局给粗计划当北极星，临到每个 stage 再用最新真实数据 + 人工把它那份 spec 调准 —— 也天然接住了你要的"每个 stage 都能让人再补输入"。注意它和 ④ 的区别：这是<b>开跑前的前向细化</b>，④ 是 gate 失败后的<b>后向回炉</b>，两者互补。</p>
+
+  <h3>③ 每个 stage 怎么用它那份 spec（喂三类节点）</h3>
+  <pre>stage 开始 → 读 spec/stages/&lt;stage&gt;.yaml
+   ├─ metrics[].target      ──▶ 自动校验：gate 比对 actual vs target     ✅ 已接 parse-eda-report
+   ├─ parameters / 目标      ──▶ AI 决策：作为判断依据与约束（决策 skill / 主 agent 读）
+   └─ 全局 technology/corner ──▶ 自动执行：模板渲染参数</pre>
+  <div class="lead">
+    一句话：<b>spec 是从上往下喂的"北极星"</b>，和流水里流动的 def/db 产物是两条线 —— 后者是<b>设计状态</b>，前者是<b>"什么算达标"</b>。
+  </div>
+
+  <h3>④ spec 不是写死的：反馈回炉</h3>
+  <p>某 stage gate 长期不过、目标不可达 → 状态机 <code>revise_spec</code> → 回 <code>SPEC_DRAFTING</code> 调 spec（如放宽某 stage 预算）→ 重新审批 → 继续流水线。</p>
+
+  <div class="lead">
+    <b>现状：</b><code>global_spec_template.yaml</code> / <code>stage_spec_template.yaml</code> / 状态机 SPEC_DRAFTING→SPEC_REVIEW / <code>spec_manager.py</code> 均已就位，<code>parse-eda-report</code> 已按 stage spec 的 metrics 做 gate。<b>待补：</b>把"global→stage 预算分解"明确成 spec-draft 的一步。spec 模板措辞已对齐无-agent（决策 skill / 主 agent / 自动校验）。
+  </div>
+</section>
+
+<!-- ============ 节点架构 ============ -->
+<section id="anatomy">
+  <h2>节点架构 — 一个节点内部是怎么分层的</h2>
+  <div class="lead">
+    看板上每个节点不是单一动作，而是一条<b>内部流水线</b>。AI 的价值集中在 <b>① 决策</b> 和 <b>⑤ 诊断</b>；
+    <b>② 渲染 / ③ 执行 / ④ 自动校验</b>是确定性的<b>横切共享能力</b>——这就是为什么 <code>run-eda-script</code> 等不画在每个节点上，而是抽到这一层只出现一次。
+  </div>
+
+  <div class="anatomy">
+    <div class="pipe">
+      <div class="node-row">
+        <div class="node-step s1"><div class="t"><span class="tag design">①</span> 决策 / 诊断</div>
+          <div class="d">读 spec + 上游产出 + 上次 eval，定参数 + 写定制片段，产出 <code>decisions.yaml</code></div></div>
+        <div class="node-side"><b>谁：</b>主 agent 执行决策 skill（playbook）<br><b>查：</b>知识库（见右）<br>这一层 = <b>AI 本体</b></div>
+      </div>
+      <div class="down">▼</div>
+      <div class="node-row">
+        <div class="node-step s2"><div class="t"><span class="tag mech">②</span> 渲染</div>
+          <div class="d">模板 <code>*.tmpl</code> + decisions → 具体 <code>step.tcl</code></div></div>
+        <div class="node-side"><b>谁：</b><code>render-tcl</code>（共享）+ per-step 模板<br>确定性，无判断</div>
+      </div>
+      <div class="down">▼</div>
+      <div class="node-row">
+        <div class="node-step s3"><div class="t"><span class="tag mech">③</span> 执行</div>
+          <div class="d">跑 tcl，收 log，验产出 → def / db / rpt</div></div>
+        <div class="node-side"><b>谁：</b><code>run-eda-script</code>（共享，<b>1 个</b>）<br>经 env_manager 解析 Innovus 路径；工具不可用时 stub 降级</div>
+      </div>
+      <div class="down">▼</div>
+      <div class="node-row">
+        <div class="node-step s4"><div class="t"><span class="tag measure">④</span> 自动校验</div>
+          <div class="d">解析报告 → <code>eval_result.yaml</code>（指标 vs target）</div></div>
+        <div class="node-side"><b>谁：</b><code>parse-eda-report</code>（共享，<b>1 个</b>）<br>确定性，不做决策</div>
+      </div>
+      <div class="loopback">⟲ 不达标：带上次 eval 回到 ①，让主 agent 据同一份 playbook 诊断后重新决策</div>
+    </div>
+
+    <div style="flex:1 1 260px;min-width:240px">
+      <h3 style="margin-top:0">① 决策时查的知识库</h3>
+      <table style="font-size:12.5px">
+        <tbody>
+          <tr><td><code>read-eda-concept</code></td><td>这个旋钮起什么作用</td></tr>
+          <tr><td><code>read-expert-doc</code></td><td>该 stage 的专家经验/启发式</td></tr>
+          <tr><td><code>read-eda-lab-doc</code></td><td>lab 示例（写片段参考）</td></tr>
+          <tr><td><code>search-eda-command</code></td><td><b style="color:#fca5a5">护栏</b>：AI 写的每条命令先校验确实存在</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:12px;color:#94a3b8">知识系统（子系统①）由此接入编排系统（子系统②）：知识库不只给人看，更是主 agent 写脚本/诊断时的随身手册。</p>
+    </div>
+  </div>
+
+  <h3>每一层"每步是否不同""复用粒度"</h3>
+  <table>
+    <thead><tr><th style="width:14%">层</th><th style="width:22%">谁负责</th><th style="width:18%">每步不同？</th><th style="width:18%">复用粒度</th><th>是不是 skill</th></tr></thead>
+    <tbody>
+      <tr><td>① 决策</td><td>决策 skill（playbook）+ 主 agent</td><td>是（判断逻辑不同）</td><td>按复杂度：stage 或 step（见开发指引）</td><td>是，<b>playbook skill</b></td></tr>
+      <tr><td>跑哪段命令</td><td>模板 <code>*.tmpl</code></td><td>是（内容不同）</td><td>每 step 一份模板</td><td>否，是 <b>数据</b></td></tr>
+      <tr><td>② 渲染</td><td><code>render-tcl</code></td><td>否</td><td>全流程共享</td><td>是，<b>1 个共享</b></td></tr>
+      <tr><td>③ 执行</td><td><code>run-eda-script</code></td><td>否</td><td>全流程共享</td><td>是，<b>1 个共享</b></td></tr>
+      <tr><td>④ 自动校验</td><td><code>parse-eda-report</code></td><td>否</td><td>全流程共享</td><td>是，<b>1 个共享</b></td></tr>
+    </tbody>
+  </table>
+  <div class="lead">
+    <b>结论：</b>"每步专属的东西"是真的 —— 它活在 <b>模板（数据）</b> 和 <b>决策 skill 的判断方法（playbook）</b> 里；判断 skill 由<b>主 agent 执行（无 sub-agent）</b>。
+    执行/渲染/自动校验这类机制横切共享，所以 <code>run-eda-script</code> 该多就让它多，但只此一个、且不画在节点上。
+  </div>
+</section>
+
+<!-- ============ 节点开发指引 ============ -->
+<section id="devguide">
+  <h2>节点开发指引 — 怎么为一个节点开发 AI 能力</h2>
+  <p>按节点类型对照开发。<b style="color:#ddd6fe">AI 决策步</b>是主要工作量；自动执行/质量门/人工只需很少配置。</p>
+
+  <h3><span class="tag design">AI 决策步</span> 完整六步（如 floorplan / cts / route / eco）</h3>
+  <ol class="recipe">
+    <li><b>写黄金模板</b> <code>templates/tcl/&lt;stage&gt;/&lt;step&gt;.tcl.tmpl</code>：固定骨架 + <code>{{占位符}}</code> + <code>### @inject:</code> 定制片段注入点。</li>
+    <li><b>定决策契约</b>：约定该 step 的 <code>&lt;step&gt;_decisions.yaml</code> 长什么样 —— <code>params</code>（要填的参数）/ <code>fragments</code>（AI 写的片段）/ <code>rationale</code>（理由，便于审计）。</li>
+    <li><b>实现决策逻辑</b>（写进该步的<b>决策 skill / playbook</b>，主 agent 执行）：读 spec + 上游产出 + 上次 eval → 推理出 decisions。这是该节点真正的"AI"。</li>
+    <li><b>接知识库 + 护栏</b>：决策查 <code>read-expert-doc</code>/<code>read-eda-concept</code>；写片段查 <code>read-eda-lab-doc</code>；<b style="color:#fca5a5">AI 写的每条命令必须过 <code>search-eda-command</code> 校验存在</b>（防幻觉）。</li>
+    <li><b>复用共享层执行</b>：decisions + 模板 → <code>render-tcl</code> → <code>run-eda-script</code> → <code>parse-eda-report</code>。<b>不要自己写执行/解析代码。</b></li>
+    <li><b>配 flow_definition.yaml</b>：把该节点写成 <code>gen → run → eval</code> 三元组并声明 inputs/outputs；重跑时把上次 eval 作为 gen 的额外输入（诊断回路）。</li>
+  </ol>
+
+  <h3><span class="tag mech">自动执行</span> / <span class="tag measure">质量门</span> / <span class="tag human">人工确认</span></h3>
+  <table>
+    <thead><tr><th style="width:16%">类型</th><th>开发什么</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tag mech">自动执行</span></td><td>只需第 ①、⑤、⑥ 步里的"模板 + 接执行"：写一份模板，参数直接来自 spec（无需判断），再走 <code>render-tcl → run-eda-script</code>。</td></tr>
+      <tr><td><span class="tag measure">质量门</span></td><td>无需写代码：在 stage spec 里声明该门的 <code>metrics</code>（名称 + target），节点执行者填 <code>parse-eda-report</code> 即可。指标提取不准时给该指标加 <code>pattern:</code> 覆盖。</td></tr>
+      <tr><td><span class="tag human">人工确认</span></td><td>只写 <code>instruction</code>（让人做什么）。流程到此 <code>await_human</code> 暂停，人工完成后 <code>resolve-human</code> 继续。</td></tr>
+    </tbody>
+  </table>
+
+  <h3>红线（所有节点共同遵守）</h3>
+  <ul class="redline">
+    <li><b>执行永远用共享 <code>run-eda-script</code></b>，别为某步单独写执行代码（否则就是 N 份雷同代码）。</li>
+    <li><b>AI 写的 Tcl 命令必须过 <code>search-eda-command</code> 校验</b>，约束在真实命令空间内 —— 防幻觉的关键。</li>
+    <li><b>每个 AI 决策落成 <code>decisions.yaml</code></b>：可审计、人可改了 re-render、新会话可续跑。</li>
+    <li><b>stub 不造假</b>：工具缺失时产占位让流程结构走通，但绝不伪造 PPA 数字，下游 gate 如实报 missing。</li>
+  </ul>
+
+  <h3>判断放哪 &amp; 决策 skill 怎么切分</h3>
+  <div class="lead">
+    判断不交给独立 sub-agent，而是写成<b>决策 playbook skill</b>（"怎么判断"的手册），由<b>主 agent</b>加载执行 —— skill 装<b>方法 / rubric</b>，运行时主 agent 对这颗芯片的真实数字现场推理，产出 <code>decisions.yaml</code>。skill <b>不</b>装"结果"（每颗芯片都不同）。
+  </div>
+  <p><b>切分判据：默认 1 个 stage 1 个 skill；满足任一条就把该 step 单拎成独立 skill：</b></p>
+  <ol class="recipe">
+    <li>它自身<b>决策 / 知识量大</b>，一个 playbook 写下去又长又散焦；</li>
+    <li>它有<b>独立的诊断 / 迭代回路</b>（如 drc_repair、fix_strategy）；</li>
+    <li>它会被<b>单独复用</b>（人工或别的流程直接调它）；</li>
+    <li>它和同 stage 其他步<b>知识体系不同</b>，硬合并会四不像。</li>
+  </ol>
+  <p style="color:#94a3b8;font-size:12.5px">反之：步骤短、共享同一套知识、总是一起做 → 合在一个 stage skill 里。<b style="color:#cbd5e1">务实做法</b>：先按 stage 起步，写胖了 / 要独立复用了再拆；floorplan、route 已知较重，可一上来就按下表拆好。</p>
+
+  <h3>推荐决策 skill 清单（复杂度驱动，9 个）</h3>
+  <table>
+    <thead><tr><th style="width:22%">决策 skill</th><th>覆盖的AI 决策步</th><th style="width:26%">来由</th></tr></thead>
+    <tbody>
+      <tr><td><code>floorplan-plan</code></td><td>gen_floorplan</td><td rowspan="3">floorplan 4 步较重 → 拆 3</td></tr>
+      <tr><td><code>floorplan-io-pins</code></td><td>place_io_pins</td></tr>
+      <tr><td><code>floorplan-macro</code></td><td>macro_placement + add_blockage（halo 紧耦合 macro）</td></tr>
+      <tr><td><code>powerplan-design</code></td><td>gen_power_plan</td><td>单AI 决策步</td></tr>
+      <tr><td><code>placement-design</code></td><td>place_opt</td><td>单AI 决策步</td></tr>
+      <tr><td><code>cts-design</code></td><td>gen_cts_spec</td><td>单AI 决策步</td></tr>
+      <tr><td><code>route-strategy</code></td><td>global_route + detail_route（布线引擎配置，知识重叠）</td><td rowspan="2">route 3 步较重 → 拆 2</td></tr>
+      <tr><td><code>route-drc-repair</code></td><td>drc_repair（迭代 search&amp;repair，另一套心智模型）</td></tr>
+      <tr><td><code>timing-eco-design</code></td><td>fix_strategy</td><td>单AI 决策步</td></tr>
+    </tbody>
+  </table>
+  <div class="legend" style="margin-top:4px">
+    <span>按 stage：6 个 —— floorplan 会太胖 ❌</span>
+    <span>按 step：11 个 —— powerplan/cts 等被无谓拆碎 ❌</span>
+    <span style="color:#bbf7d0">复杂度驱动：9 个 ✅</span>
+  </div>
+  <div class="lead">
+    <b>封装红线：</b>即便把AI 决策步打包成独立 skill，它也只装<b>判断方法（playbook）+ 模板引用</b>；渲染委托共享 <code>render-tcl</code>、执行委托共享 <code>run-eda-script</code>。<b>绝不</b>在决策 skill 里重写执行逻辑，也<b>绝不</b>做 per-step 的执行 skill。
+  </div>
+</section>
+
+<!-- ============ 共享能力 & 数据流 ============ -->
+<section id="shared">
+  <h2>共享能力（横切，不在节点上重复）</h2>
+  <p>这些是被所有 stage 反复复用的确定性能力。它们是流程的"手和尺"，AI 是"脑"。正因为横切，本图不在每个节点上重画它们。</p>
+  <table>
+    <thead><tr><th style="width:20%">能力</th><th style="width:90px">类型</th><th style="width:90px">状态</th><th>职责</th></tr></thead>
+    <tbody>
+      <tr><td><code>render-tcl</code></td><td><span class="tag mech">skill</span></td><td><span class="pill todo">待建</span></td><td>模板 <code>*.tmpl</code> + <code>decisions.yaml</code> → 具体 <code>step.tcl</code>（确定性渲染）</td></tr>
+      <tr><td><code>run-eda-script</code></td><td><span class="tag mech">skill</span></td><td><span class="pill built">已建</span></td><td>跑 tcl、收 log、验产出；工具不可用时 stub 降级。<b>所有执行步共用这一个。</b></td></tr>
+      <tr><td><code>parse-eda-report</code></td><td><span class="tag measure">skill</span></td><td><span class="pill built">已建</span></td><td>报告 → <code>eval_result.yaml</code>；全部 8 个质量门 + congestion 分析共用。</td></tr>
+      <tr><td><code>env_manager</code></td><td><span class="tag mech">基座</span></td><td><span class="pill built">已建</span></td><td>定位 EDA 工具二进制（detect / set / check）；机器级 <code>~/.chip-backend-ai/env.json</code>，自动执行调用时解析路径 → <b>工程可移植</b>。</td></tr>
+      <tr><td><code>version-check</code></td><td><span class="tag mech">import 步</span></td><td><span class="pill todo">待建</span></td><td>数据准备：校验 netlist·SDC·lib·PDK 同一 release（确定性、可复用）。"输入齐不齐"已由 flow_loader <code>blocked_inputs</code> 覆盖、工具由 <code>env_manager</code> 覆盖 —— 故<b>不需要独立的胖 readiness-check</b>。</td></tr>
+    </tbody>
+  </table>
+  <div class="lead" style="border-color:var(--mech)">
+    <b style="color:#7dd3fc">取舍：为什么没有独立的"前置就绪"闸 / 胖 readiness-check skill？</b>
+    早先想把 <b>工具 ＋ 输入齐全 ＋ 版本一致</b> 合成一个横跨三者的胖 readiness-check 放流程最前、且"每次会话都重跑"。复盘后拆开各归其位 —— 因为三块的<b>作用域和生命周期都不同</b>：
+    <br>① <b>env / 工具</b>：机器级、跨所有项目共享、存在 workspace <b>之外</b>（<code>env.json</code>）—— 既塞不进 flow_loader 的输入模型（它只认 workspace 文件），也不该塞进 import（否则每个新项目都重找工具）。故它是<b>机器 bootstrap</b>，<b>不 gate spec</b>（spec 不调工具），resume 只 <code>check</code> 廉价校验。
+    <br>② <b>输入齐全</b>：flow_loader 的 <code>blocked_inputs</code> 逐文件查存在<b>本就免费做了</b>，跑到 import 自然拦。
+    <br>③ <b>版本一致</b>：一个确定性 <code>version-check</code> skill 步，放 import 头部。
+    <br><b>结论</b>：三块都有现成的家，不必再造一个胖闸。"每次会话都重跑"也被收回 —— 只对 env 的廉价 <code>check</code> 成立；②③ 是普通 flow 步、跑一次即 <code>done</code>，resume 不重跑。
+  </div>
+  <h3>判断由谁承接：决策 playbook skill + 主 agent（无 sub-agent）</h3>
+  <p>判断型步骤不再交给独立 sub-agent，而是把"判断方法"写进决策 <b>playbook skill</b>，由<b>主 agent</b> 加载执行。9 个决策 skill 的清单与切分判据见「<b>节点开发指引</b>」页。</p>
+  <table>
+    <thead><tr><th style="width:32%">执行者</th><th>承担</th></tr></thead>
+    <tbody>
+      <tr><td><b>主 agent</b> + 决策 playbook skill ×9</td><td>全部 11 个AI 决策步（清单见节点开发指引页）</td></tr>
+      <tr><td>human</td><td>confirm_macro · waiver_review · final_checklist</td></tr>
+    </tbody>
+  </table>
+
+  <h2 style="margin-top:34px">主数据流（DEF/DB 链）</h2>
+  <p>每步 output 是下一步 input，依赖关系即由此构成；引擎据此判断输入是否就位、能否续跑。</p>
+  <div class="flowline">
+    <span class="n">netlist+lef+lib</span><span class="a">→</span><span class="n">imported.db</span><span class="a">→</span><span class="n">mmmc.db</span><span class="a">→</span><span class="n">import_done.db</span><span class="a">→</span><span class="n">fp_init.def</span><span class="a">→</span><span class="n">fp_pins.def</span><span class="a">→</span><span class="n">fp_macro.def</span><span class="a">→</span><span class="n">floorplan.def</span>
+  </div>
+  <div class="flowline">
+    <span class="n">floorplan.def</span><span class="a">→</span><span class="n">power_plan.tcl</span><span class="a">→</span><span class="n">pg.def</span><span class="a">→</span><span class="n">pg_full.def</span><span class="a">→</span><span class="n">placed.def</span><span class="a">→</span><span class="n">placed_scan.def</span>
+  </div>
+  <div class="flowline">
+    <span class="n">placed_scan.def</span><span class="a">→</span><span class="n">cts.spec</span><span class="a">→</span><span class="n">cts.def</span><span class="a">→</span><span class="n">cts_opt.def</span><span class="a">→</span><span class="n">groute.def</span><span class="a">→</span><span class="n">routed.def</span><span class="a">→</span><span class="n">routed_clean.def</span>
+  </div>
+  <div class="flowline">
+    <span class="n">routed_clean.def</span><span class="a">→</span><span class="n">design.spef</span><span class="a">→</span><span class="n">timing.rpt</span><span class="a">→</span><span class="n">eco.changes</span><span class="a">→</span><span class="n">eco.def</span><span class="a">→</span><span class="n">filled.def</span><span class="a">→</span><span class="n">final.def</span><span class="a">→</span><span class="n">chip.gds</span>
+  </div>
+  <h3>启动输入清单（按「输入信息」vs「基座信息」分类）</h3>
+  <table>
+    <thead><tr><th style="width:13%">类别</th><th style="width:42%">内容</th><th style="width:13%">归类</th><th>主要用在</th></tr></thead>
+    <tbody>
+      <tr><td><b>设计数据</b></td><td>netlist(.v) · SDC · UPF/CPF 电源意图 · DFT/scan · activity(SAIF/VCD)</td><td><b style="color:#c7d2fe">输入</b></td><td>import 进，随流程流动</td></tr>
+      <tr><td><b>Macro / IP</b></td><td>硬核 macro 的 LEF/GDS/lib/CDL ＋ 集成约束(halo/keep-out)</td><td><b style="color:#c7d2fe">输入</b></td><td>import / floorplan</td></tr>
+      <tr><td><b>物理约束</b></td><td>die/core 尺寸 · IO/pad/pad ring · macro 摆放指引 · PG 策略</td><td><b style="color:#c7d2fe">输入</b></td><td>floorplan / powerplan</td></tr>
+      <tr><td><b>工艺 / PDK</b></td><td>多 corner Liberty · RC tech · LEF/metal stack · 特殊单元 · signoff decks · EM-IR/fill 规则</td><td><b style="color:#a5f3fc">基座</b></td><td>贯穿(import/route/signoff)</td></tr>
+      <tr><td><b>分析配置</b></td><td>MMMC 视图矩阵(corner × mode) · PVT</td><td><b style="color:#a5f3fc">基座</b></td><td>setup_mmmc / 全程时序</td></tr>
+      <tr><td><b>工具 / 环境</b></td><td>Innovus + 工具链路径(<code>env.json</code>) · 算力/grid</td><td><b style="color:#a5f3fc">基座</b></td><td>所有自动执行</td></tr>
+      <tr><td><b>项目元信息</b></td><td>层次(top/block) · tapeout 日期 · foundry/shuttle</td><td><b style="color:#fde68a">spec</b></td><td>Spec 层 / 全局</td></tr>
+    </tbody>
+  </table>
+  <p style="color:#94a3b8;font-size:12.5px"><b style="color:#c7d2fe">输入信息</b> = 设计专属、从起点喂入、随流程流动；<b style="color:#a5f3fc">基座信息</b> = 工艺/工具/知识，相对稳定、贯穿全程被节点读取。<b>工具/环境</b>由机器级 <code>env_manager</code> bootstrap 定位；<b>设计数据</b>的"齐不齐 ＋ 版本一致"在 <code>import</code> 头部检查（flow_loader <code>blocked_inputs</code> ＋ <code>version-check</code>）后进流水线（见上方取舍说明）。</p>
+</section>
+
+</main>
+
+<footer>
+  节点数据忠实还原自 <code>plugins/chip-backend-ai/templates/flow_definition.yaml</code>（9 stage / 41 节点）·
+  架构层级见「节点架构」页 · 横切共享能力（render-tcl / run-eda-script / parse-eda-report）单列于「共享能力」页，不在节点上重复。
+</footer>
+
+<script>
+  const tabs = document.querySelectorAll('nav.tabs button');
+  const sections = document.querySelectorAll('main section');
+  tabs.forEach(btn => btn.addEventListener('click', () => {
+    tabs.forEach(b => b.classList.remove('active'));
+    sections.forEach(s => s.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+    window.scrollTo({top:0, behavior:'smooth'});
+  }));
+</script>
+</body>
+</html>

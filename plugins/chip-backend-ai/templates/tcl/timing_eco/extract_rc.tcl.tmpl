@@ -1,0 +1,20 @@
+# ===========================================================================
+# extract_rc.tcl  —  golden template, rendered by render-tcl
+#   Mechanical step: parasitic (RC) extraction on the DRC-clean routed design →
+#   SPEF for signoff STA. No decision layer — params come straight from the
+#   stage spec + the artifact path.
+#   double-brace placeholders filled from stage spec + parameters + --var.
+#   Produces design.spef.
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- RC extraction engine + accuracy effort ---------------------------------
+setExtractRCMode -engine {{rc_engine}}
+setExtractRCMode -effortLevel {{rc_effort}}
+setExtractRCMode -coupled {{rc_coupled}}
+
+# --- extract parasitics across the signoff process corners ------------------
+extractRC
+
+# --- write the SPEF consumed by signoff STA ---------------------------------
+spefOut {{artifact_dir}}/design.spef

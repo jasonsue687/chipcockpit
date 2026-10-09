@@ -1,0 +1,19 @@
+# ===========================================================================
+# early_ir.tcl  —  golden template, rendered by render-tcl
+#   Mechanical step: early-stage static IR-drop / EM estimate on the power
+#   grid and emit a parseable IR report for the power_eval gate. No decision
+#   layer — params come straight from the stage spec.
+#   double-brace placeholders filled from stage spec + parameters + --var.
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- power-analysis setup (rail nets + early/vectorless mode) --------------
+setPowerAnalysisMode -method static -analysisView {{analysis_view}}
+set_power_analysis_mode -honor_negative_energy false
+
+# --- static IR-drop / EM analysis on the power grid ------------------------
+analyzePower -nets { {{power_net}} {{ground_net}} } -rail_analysis_mode {{ir_mode}}
+
+# --- summarize early IR-drop / EM into the gate report ---------------------
+report_ir -outfile {{report_dir}}/ir.rpt
+reportEM -nets { {{power_net}} {{ground_net}} } >> {{report_dir}}/ir.rpt

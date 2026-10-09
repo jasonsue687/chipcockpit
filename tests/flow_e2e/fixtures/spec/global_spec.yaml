@@ -1,0 +1,33 @@
+# SIMULATED fixture — global spec for the import-stage e2e validation.
+# Derived from templates/global_spec_template.yaml.
+
+project_name: "sim_block"
+spec_version: "v1"
+
+human_goal: "Validate the import stage end-to-end in SIMULATION mode (no real EDA tool)."
+
+target_ppa:
+  timing:
+    wns_ns: -0.1
+    tns_ns: -1.0
+    hold_wns_ns: 0.0
+  power:
+    total_power_mw: null
+    leakage_power_mw: null
+  area:
+    utilization_min: 0.60
+    utilization_max: 0.80
+
+global_constraints:
+  max_stage_retries: 3
+  global_retry_budget: 15
+  technology: "sim_n5"
+  design_intent: "Synthetic block used only to exercise the flow engine + gates."
+
+stages:
+  - import
+
+termination_criteria:
+  all_stages_passed: true
+  timing_signoff: false
+  drc_clean: true

@@ -1,0 +1,22 @@
+# ===========================================================================
+# place_io_pins.tcl  —  golden template, rendered by render-tcl
+#   IO pin placement / grouping (block level) or pad ring (top level).
+#   double-brace placeholders filled from stage spec + decisions(params) + --var;
+#   '### @inject:<block>' injects AI-authored fragments from decisions.fragments
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- default pin assignment: even spread on the chosen routing layers ------
+#   horizontal-edge pins on {{pin_layer_h}}, vertical-edge pins on {{pin_layer_v}}.
+setPinAssignMode -pinEditInBatch true
+editPin -layer {{pin_layer_h}} -spreadType center \
+    -spacing {{pin_spacing_um}} -side {{pin_side}} -pin *
+assignIoPins -layer {{pin_layer_v}} -side Top -pin *
+
+# --- AI-authored per-group / per-bus pin constraints -----------------------
+### @inject:io_pin_assignments
+
+setPinAssignMode -pinEditInBatch false
+
+# --- persist floorplan with pins placed ------------------------------------
+defOut {{artifact_dir}}/fp_pins.def

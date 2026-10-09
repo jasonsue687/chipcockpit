@@ -1,0 +1,19 @@
+{
+  "name": "chip-backend-ai",
+  "version": "0.4.6",
+  "description": "AI assistant for chip physical design (PD): progressive disclosure EDA knowledge base + autonomous backend flow orchestration (floorplan \u2192 CTS \u2192 route) with state machine, sub-agent dispatch, and human-in-the-loop spec approval.",
+  "author": {
+    "name": "ChipCockpit",
+    "email": "contact@chipcockpit.org"
+  },
+  "keywords": [
+    "eda",
+    "physical-design",
+    "innovus",
+    "tcl",
+    "vlsi",
+    "chip-design",
+    "orchestration",
+    "backend-flow"
+  ]
+}

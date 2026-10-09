@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ChipFlow 项目驾驶舱</title>
+  <meta name="description" content="本地只读芯片后端设计流程状态与节点产物查看器">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand-lockup">
+        <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div>
+          <div class="eyebrow">PHYSICAL IMPLEMENTATION</div>
+          <h1>ChipFlow 项目驾驶舱</h1>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <span class="readonly-badge">只读模式</span>
+        <label class="auto-refresh"><input id="auto-refresh" type="checkbox" checked> 自动刷新</label>
+        <button id="refresh-button" class="button secondary" type="button">刷新状态</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="project-hero" aria-labelledby="project-name">
+        <div class="project-heading">
+          <p class="section-kicker">当前打开项目</p>
+          <h2 id="project-name">正在读取工作区…</h2>
+          <p id="workspace-path" class="workspace-path"></p>
+          <div class="status-line">
+            <span id="lifecycle-badge" class="lifecycle-badge">—</span>
+            <span id="status-description">等待状态快照</span>
+          </div>
+        </div>
+        <div class="progress-orbit" aria-label="流程完成度">
+          <div class="orbit-value"><strong id="progress-percent">0%</strong><span>完成度</span></div>
+        </div>
+      </section>
+
+      <section class="metric-grid" aria-label="项目摘要">
+        <article class="metric-card accent-cyan">
+          <span class="metric-label">当前位置</span>
+          <strong id="current-stage">—</strong>
+          <span id="current-step" class="metric-detail">尚未定位节点</span>
+        </article>
+        <article class="metric-card accent-green">
+          <span class="metric-label">节点进度</span>
+          <strong id="step-progress">0 / 0</strong>
+          <span class="metric-detail">按真实节点与产物统计</span>
+        </article>
+        <article class="metric-card accent-purple">
+          <span class="metric-label">Spec 版本</span>
+          <strong id="spec-version">—</strong>
+          <span id="flow-version" class="metric-detail">流程版本 —</span>
+        </article>
+        <article class="metric-card accent-orange">
+          <span class="metric-label">Retry Budget</span>
+          <strong id="retry-budget">0 / 0</strong>
+          <span id="retry-remaining" class="metric-detail">剩余 0 次</span>
+        </article>
+      </section>
+
+      <section id="blocker-panel" class="notice blocker" hidden>
+        <div class="notice-icon" aria-hidden="true">!</div>
+        <div><strong>当前阻塞</strong><p id="blocker-message"></p></div>
+      </section>
+
+      <section id="warning-panel" class="notice warning" hidden>
+        <div class="notice-icon" aria-hidden="true">△</div>
+        <div class="notice-content"><strong>状态一致性提示</strong><ul id="warning-list"></ul></div>
+      </section>
+
+      <section class="flow-section" aria-labelledby="flow-heading">
+        <div class="section-header">
+          <div>
+            <p class="section-kicker">FLOW MAP</p>
+            <h2 id="flow-heading">完整流程与节点状态</h2>
+            <p>点击任意节点查看真实输入输出、运行日志、模型交互摘要和历史 run。</p>
+          </div>
+          <div class="flow-tools">
+            <label class="search-box">
+              <span class="sr-only">搜索节点</span>
+              <input id="node-search" type="search" placeholder="搜索 stage 或节点…" autocomplete="off">
+            </label>
+            <button id="locate-current" class="button ghost" type="button">定位当前节点</button>
+          </div>
+        </div>
+
+        <div class="legend" aria-label="节点状态图例">
+          <span><i class="legend-dot pending"></i>待执行</span>
+          <span><i class="legend-dot running"></i>执行中</span>
+          <span><i class="legend-dot awaiting_human"></i>等待人工</span>
+          <span><i class="legend-dot done"></i>已完成</span>
+          <span><i class="legend-dot failed"></i>失败/阻塞</span>
+          <span><i class="legend-dot inconsistent"></i>状态不一致</span>
+        </div>
+
+        <div id="flow-board" class="flow-board" aria-live="polite"></div>
+      </section>
+
+      <section class="activity-section" aria-labelledby="activity-heading">
+        <div class="section-header compact">
+          <div>
+            <p class="section-kicker">AUDIT TRAIL</p>
+            <h2 id="activity-heading">最近编排决策</h2>
+          </div>
+          <span id="snapshot-time" class="snapshot-time"></span>
+        </div>
+        <div id="decision-list" class="decision-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="drawer-backdrop" class="drawer-backdrop" hidden></div>
+  <aside id="node-drawer" class="node-drawer" aria-labelledby="drawer-title" aria-hidden="true">
+    <div class="drawer-header">
+      <div>
+        <p id="drawer-stage" class="section-kicker">NODE DETAIL</p>
+        <h2 id="drawer-title">节点详情</h2>
+      </div>
+      <button id="drawer-close" class="icon-button" type="button" aria-label="关闭节点详情">×</button>
+    </div>
+    <div id="drawer-body" class="drawer-body"></div>
+  </aside>
+
+  <div id="error-toast" class="error-toast" role="alert" hidden></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,529 @@
+# Flow Definition — 芯片后端物理实现完整流程配方
+# ---------------------------------------------------------------------------
+# 静态、跨项目复用的「流程配方」。由 core/workflow/flow_loader.py 加载，
+# 编排器据此 + state/flow_progress.yaml 推进整个后端设计流程。
+#
+# 它不替代全局状态机(state_manager.py)——状态机仍负责元生命周期
+# (SPEC_REVIEW / retry budget / rollback / abort)。本文件只填充
+# STAGE_RUNNING 内部：跑哪些子步骤、用哪个执行者、读写哪些文件。
+#
+# executor.type:
+#   skill  — 机械/可参数化步骤，编排器调用已注册 skill
+#   agent  — 判断型步骤，编排器唤醒子智能体现场推理
+#   human  — 人工 gate，流程暂停，等人工操作完成后 resolve-human 继续
+#
+# inputs/outputs.path 相对 workspace 根目录。
+#   required:true 的 input 缺失 → 该步阻塞(blocked_inputs)
+#   required:true 的 output 全部存在 → 该步视为完成(resume 续跑的依据)
+#
+# gate:true 表示这是阶段质量门，产出 eval_result 供状态机判 pass/fail。
+# ---------------------------------------------------------------------------
+
+flow: backend_physical_implementation
+version: v1
+description: 从网表导入到 GDS 交付的完整后端物理实现流程（9 stage）
+
+stages:
+  # ===================== #0 Design Import =====================
+  - id: import
+    name: Design Import / 数据准备
+    steps:
+      # 前置就绪「版本一致」半：确定性校验 netlist·SDC·lib·LEF/PDK 同一 release。
+      # 不调 EDA 工具，非 gate；流程头部第一步，跑一次通过即 done。harness 特例分派
+      # (executor.ref == version-check)，不走 render-tcl + run-eda-script。
+      # 「输入齐备」半由 flow_loader 的 blocked_inputs 负责，「工具就绪」由 env_manager。
+      - id: version_check
+        name: 校验输入版本一致（netlist·SDC·lib·PDK 同 release）
+        executor: { type: skill, ref: version-check }
+        inputs:
+          - { name: netlist, path: inputs/netlist.v,       required: true }
+          - { name: sdc,     path: inputs/constraints.sdc, required: true }
+          - { name: lef,     path: inputs/tech.lef,        required: true }
+          - { name: lib,     path: inputs/cells.lib,       required: true }
+        outputs:
+          - { name: version_check_rpt, path: stages/import/reports/version_check.rpt, required: true }
+      - id: read_design
+        name: 读入网表 / 物理库 / 时序库 / RC tech
+        executor: { type: skill, ref: run-eda-script }
+        template: tcl/import/read_design.tcl.tmpl
+        inputs:
+          - { name: netlist, path: inputs/netlist.v,  required: true }
+          - { name: lef,     path: inputs/tech.lef,   required: true }
+          - { name: lib,     path: inputs/cells.lib,  required: true }
+        outputs:
+          - { name: imported_db, path: stages/import/artifacts/imported.db, required: true }
+      - id: setup_mmmc
+        name: 配置 MMMC + 加载 SDC
+        executor: { type: skill, ref: run-eda-script }
+        template: tcl/import/setup_mmmc.tcl.tmpl
+        inputs:
+          - { name: imported_db, path: stages/import/artifacts/imported.db, required: true }
+          - { name: sdc,         path: inputs/constraints.sdc,             required: true }
+        outputs:
+          - { name: mmmc_db, path: stages/import/artifacts/mmmc.db, required: true }
+      - id: global_net_connect
+        name: globalNetConnect（PG 逻辑连接）+ tie/physical-only 设置
+        executor: { type: skill, ref: run-eda-script }
+        template: tcl/import/global_net_connect.tcl.tmpl
+        inputs:
+          - { name: mmmc_db, path: stages/import/artifacts/mmmc.db, required: true }
+        outputs:
+          - { name: import_done_db, path: stages/import/artifacts/import_done.db, required: true }
+      - id: check_design
+        name: 完整性检查（check_design / check_timing -unconstrained）
+        executor: { type: skill, ref: run-eda-script }
+        template: tcl/import/check_design.tcl.tmpl
+        inputs:
+          - { name: import_done_db, path: stages/import/artifacts/import_done.db, required: true }
+        outputs:
+          - { name: check_rpt, path: stages/import/reports/check_design.rpt, required: true }
+      - id: import_eval
+        name: 导入质量 gate
+        executor: { type: skill, ref: parse-eda-report }
+        gate: true
+        # gate input report (.rpt) + stage spec at spec/stages/import.yaml
+        report: stages/import/reports/check_design.rpt
+        inputs:
+          - { name: check_rpt, path: stages/import/reports/check_design.rpt, required: true }
+        outputs:
+          - { name: import_eval, path: stages/import/eval_result.yaml, required: true }
+
+  # ===================== #1 Floorplan =====================
+  - id: floorplan
+    name: Floorplan / 布局规划
+    steps:
+      # AI 决策步：executor=决策 skill；harness/主 agent 跑 gen_decisions→render→run。
+      - id: gen_floorplan
+        name: 定义 die/core 尺寸、形状、aspect ratio
+        executor: { type: skill, ref: floorplan-plan }
+        template: tcl/floorplan/gen_floorplan.tcl.tmpl
+        decisions: stages/floorplan/decisions/gen_floorplan_decisions.yaml
+        inputs:
+          - { name: import_done_db, path: stages/import/artifacts/import_done.db, required: true }
+        outputs:
+          - { name: fp_init_def, path: stages/floorplan/artifacts/fp_init.def, required: true }
+      - id: place_io_pins
+        name: 摆 IO pin（block 级）/ pad ring（top 级）
+        executor: { type: skill, ref: floorplan-io-pins }
+        template: tcl/floorplan/place_io_pins.tcl.tmpl
+        decisions: stages/floorplan/decisions/place_io_pins_decisions.yaml
+        inputs:
+          - { name: fp_init_def, path: stages/floorplan/artifacts/fp_init.def, required: true }
+        outputs:
+          - { name: fp_pins_def, path: stages/floorplan/artifacts/fp_pins.def, required: true }
+      - id: macro_placement
+        name: Macro 摆放（数据流 / 朝向 / channel）
+        executor: { type: skill, ref: floorplan-macro }
+        template: tcl/floorplan/macro_placement.tcl.tmpl
+        decisions: stages/floorplan/decisions/macro_placement_decisions.yaml
+        inputs:
+          - { name: fp_pins_def, path: stages/floorplan/artifacts/fp_pins.def, required: true }
+        outputs:
+          - { name: fp_macro_def, path: stages/floorplan/artifacts/fp_macro.def, required: true }
+      - id: confirm_macro
+        name: 人工确认 macro / pin 摆放
+        executor: { type: human }
+        instruction: >
+          在 EDA GUI 中检查 macro 与 IO pin 摆放是否合理（数据流朝向、channel 宽度、
+          pin 拥塞）。确认无误后 resolve-human 继续；若需调整，手动改完再继续。
+        inputs:
+          - { name: fp_macro_def, path: stages/floorplan/artifacts/fp_macro.def, required: true }
+      - id: add_blockage
+        name: 加 halo / blockage / voltage area
+        executor: { type: skill, ref: floorplan-macro }
+        template: tcl/floorplan/add_blockage.tcl.tmpl
+        decisions: stages/floorplan/decisions/add_blockage_decisions.yaml
+        inputs:
+          - { name: fp_macro_def, path: stages/floorplan/artifacts/fp_macro.def, required: true }
+        outputs:
+          - { name: fp_def, path: stages/floorplan/artifacts/floorplan.def, required: true }
+          # 末步同时产 gate 报告（仿 import 的 check_design.rpt），让 mock 写可解析指标。
+          - { name: fp_check_rpt, path: stages/floorplan/reports/floorplan_check.rpt, required: true }
+      - id: floorplan_eval
+        name: Floorplan 质量 gate（utilization / channel）
+        executor: { type: skill, ref: parse-eda-report }
+        gate: true
+        # gate 解析的报告 (.rpt) + spec/stages/floorplan.yaml 指标。
+        report: stages/floorplan/reports/floorplan_check.rpt
+        inputs:
+          - { name: fp_check_rpt, path: stages/floorplan/reports/floorplan_check.rpt, required: true }
+        outputs:
+          - { name: fp_eval, path: stages/floorplan/eval_result.yaml, required: true }
+      # 人工门：基于已解析的 eval_result，对 floorplan 结果做指标级签核（视觉确认见 confirm_macro）。
+      - id: confirm_floorplan_result
+        name: 人工确认 floorplan 结果（utilization / channel / 时序裕量）
+        executor: { type: human }
+        instruction: >
+          审阅 floorplan gate 的 eval_result（利用率 / channel / pre-place 时序裕量）。
+          确认可进入 powerplan 后 resolve-human；若不满意，手动调整 floorplan 后再继续。
+        inputs:
+          - { name: fp_eval,      path: stages/floorplan/eval_result.yaml,            required: true }
+          - { name: fp_check_rpt, path: stages/floorplan/reports/floorplan_check.rpt, required: true }
+
+  # ===================== #2 Power Planning =====================
+  - id: powerplan
+    name: Power Planning / 电源规划
+    steps:
+      # AI 决策步：executor=决策 skill；harness/主 agent 跑 gen_decisions→render→run。
+      # 该步产出自包含的 power_plan.tcl 工件（供下游 run_power_plan source）。
+      - id: gen_power_plan
+        name: 生成电源环 / 条带 / sroute 脚本
+        executor: { type: skill, ref: powerplan-design }
+        template: tcl/powerplan/gen_power_plan.tcl.tmpl
+        decisions: stages/powerplan/decisions/gen_power_plan.yaml
+        inputs:
+          - { name: fp_def, path: stages/floorplan/artifacts/floorplan.def, required: true }
+        outputs:
+          - { name: pg_tcl, path: stages/powerplan/artifacts/power_plan.tcl, required: true }
+      - id: run_power_plan
+        name: 执行 PG（addRing / addStripe / sroute / follow-pin）
+        executor: { type: skill, ref: run-eda-script }
+        template: tcl/powerplan/run_power_plan.tcl.tmpl
+        inputs:
+          - { name: pg_tcl, path: stages/powerplan/artifacts/power_plan.tcl, required: true }
+        outputs:
+          - { name: pg_def, path: stages/powerplan/artifacts/pg.def, required: true }
+      - id: insert_tap_decap
+        name: 插 tap / endcap / decap / power switch
+        executor: { type: skill, ref: run-eda-script }
+        template: tcl/powerplan/insert_tap_decap.tcl.tmpl
+        inputs:
+          - { name: pg_def, path: stages/powerplan/artifacts/pg.def, required: true }
+        outputs:
+          - { name: pg_full_def, path: stages/powerplan/artifacts/pg_full.def, required: true }
+      - id: early_ir
+        name: 早期 IR-drop / EM 评估
+        executor: { type: skill, ref: run-eda-script }
+        template: tcl/powerplan/early_ir.tcl.tmpl
+        inputs:
+          - { name: pg_full_def, path: stages/powerplan/artifacts/pg_full.def, required: true }
+        outputs:
+          # 末步产 gate 报告 ir.rpt（仿 import/floorplan），让 mock 写可解析 IR 指标。
+          - { name: ir_rpt, path: stages/powerplan/reports/ir.rpt, required: true }
+      - id: power_eval
+        name: 电源网络 gate（IR drop / 连通性）
+        executor: { type: skill, ref: parse-eda-report }
+        gate: true
+        # gate 解析的报告 (.rpt) + spec/stages/powerplan.yaml 指标。
+        report: stages/powerplan/reports/ir.rpt
+        inputs:
+          - { name: ir_rpt, path: stages/powerplan/reports/ir.rpt, required: true }
+        outputs:
+          - { name: power_eval, path: stages/powerplan/eval_result.yaml, required: true }
+      # 人工门：对电源规划结果做指标级签核（IR drop / 连通性 / EM 余量）。
+      - id: confirm_powerplan_result
+        name: 人工确认电源规划结果（IR drop / 连通性）
+        executor: { type: human }
+        instruction: >
+          审阅 power gate 的 eval_result（IR drop / PG 连通性 / EM 余量）。
+          确认电源网络可接受后 resolve-human 进入 placement；否则手动调整 PG 后再继续。
+        inputs:
+          - { name: power_eval, path: stages/powerplan/eval_result.yaml, required: true }
+          - { name: ir_rpt,     path: stages/powerplan/reports/ir.rpt,   required: true }
+
+  # ===================== #3 Placement =====================
+  - id: placement
+    name: Placement / 标准单元布局
+    steps:
+      # AI 决策步：executor=决策 skill；harness/主 agent 跑 gen_decisions→render→run。
+      - id: place_opt
+        name: 标准单元布局 + 优化（含 tie cell / HFNS）
+        executor: { type: skill, ref: placement-design }
+        template: tcl/placement/place_opt.tcl.tmpl
+        decisions: stages/placement/decisions/place_opt.yaml
+        inputs:
+          - { name: pg_full_def, path: stages/powerplan/artifacts/pg_full.def, required: true }
+        outputs:
+          - { name: placed_def, path: stages/placement/artifacts/placed.def, required: true }
+      - id: scan_reorder
+        name: Scan chain reorder
+        executor: { type: skill, ref: run-eda-script }
+        template: tcl/placement/scan_reorder.tcl.tmpl
+        inputs:
+          - { name: placed_def, path: stages/placement/artifacts/placed.def, required: true }
+        outputs:
+          - { name: placed_scan_def, path: stages/placement/artifacts/placed_scan.def, required: true }
+      - id: congestion_analysis
+        name: Congestion 分析（trial route）
+        # 它要 *产出* congestion.rpt（trial-route 报告），所以是自动执行(run-eda-script)，
+        # 不是解析(parse-eda-report)。下游 placement_eval 才解析这份报告。
+        executor: { type: skill, ref: run-eda-script }
+        template: tcl/placement/congestion_analysis.tcl.tmpl
+        inputs:
+          - { name: placed_scan_def, path: stages/placement/artifacts/placed_scan.def, required: true }
+        outputs:
+          - { name: congestion_rpt, path: stages/placement/reports/congestion.rpt, required: true }
+      - id: placement_eval
+        name: Placement gate（congestion / pre-CTS timing）
+        executor: { type: skill, ref: parse-eda-report }
+        gate: true
+        # gate 解析的报告 (.rpt) + spec/stages/placement.yaml 指标（与 power_eval 对齐）。
+        report: stages/placement/reports/congestion.rpt
+        inputs:
+          - { name: congestion_rpt, path: stages/placement/reports/congestion.rpt, required: true }
+        outputs:
+          - { name: placement_eval, path: stages/placement/eval_result.yaml, required: true }
+      # 人工门：对布局结果做指标级签核（congestion / pre-CTS timing）。
+      - id: confirm_placement_result
+        name: 人工确认布局结果（congestion / pre-CTS timing）
+        executor: { type: human }
+        instruction: >
+          审阅 placement gate 的 eval_result（congestion / 利用率 / pre-CTS 时序）。
+          确认布局可接受后 resolve-human 进入 CTS；否则手动调整布局后再继续。
+        inputs:
+          - { name: placement_eval, path: stages/placement/eval_result.yaml,       required: true }
+          - { name: congestion_rpt, path: stages/placement/reports/congestion.rpt, required: true }
+
+  # ===================== #4 CTS =====================
+  - id: cts
+    name: CTS / 时钟树综合
+    steps:
+      # AI 决策步：executor=决策 skill；harness/主 agent 跑 gen_decisions→render→run。
+      # 注意：本步 output 是 cts.spec（CTS 规格产物，非 .def），下游 build_clock_tree 读它。
+      - id: gen_cts_spec
+        name: 配置 CTS spec（target skew / NDR / leaf cell / skew group / exclude pin）
+        executor: { type: skill, ref: cts-design }
+        template: tcl/cts/gen_cts_spec.tcl.tmpl
+        decisions: stages/cts/decisions/gen_cts_spec.yaml
+        inputs:
+          - { name: placed_scan_def, path: stages/placement/artifacts/placed_scan.def, required: true }
+        outputs:
+          - { name: cts_spec, path: stages/cts/artifacts/cts.spec, required: true }
+      - id: build_clock_tree
+        name: 时钟树构建 + skew 平衡 + clock 布线
+        executor: { type: skill, ref: run-eda-script }
+        template: tcl/cts/build_clock_tree.tcl.tmpl
+        inputs:
+          - { name: cts_spec, path: stages/cts/artifacts/cts.spec, required: true }
+        outputs:
+          - { name: cts_def, path: stages/cts/artifacts/cts.def, required: true }
+      - id: postcts_opt
+        name: Post-CTS 优化（hold/setup + DRV）
+        executor: { type: skill, ref: run-eda-script }
+        template: tcl/cts/postcts_opt.tcl.tmpl
+        inputs:
+          - { name: cts_def, path: stages/cts/artifacts/cts.def, required: true }
+        outputs:
+          - { name: cts_opt_def, path: stages/cts/artifacts/cts_opt.def, required: true }
+          - { name: cts_rpt,     path: stages/cts/reports/clock_tree.rpt, required: true }
+      - id: cts_eval
+        name: CTS gate（skew / insertion delay / timing）
+        executor: { type: skill, ref: parse-eda-report }
+        gate: true
+        # gate 解析的报告 (.rpt) + spec/stages/cts.yaml 指标（与 placement_eval 对齐）。
+        report: stages/cts/reports/clock_tree.rpt
+        inputs:
+          - { name: cts_rpt, path: stages/cts/reports/clock_tree.rpt, required: true }
+        outputs:
+          - { name: cts_eval, path: stages/cts/eval_result.yaml, required: true }
+      # 人工门：对 CTS 结果做指标级签核（skew / insertion delay / 时序）。
+      - id: confirm_cts_result
+        name: 人工确认 CTS 结果（skew / insertion delay / 时序）
+        executor: { type: human }
+        instruction: >
+          审阅 CTS gate 的 eval_result（target skew 达成 / insertion delay / post-CTS 时序）。
+          确认时钟树可接受后 resolve-human 进入 route；否则手动调整后再继续。
+        inputs:
+          - { name: cts_eval, path: stages/cts/eval_result.yaml,       required: true }
+          - { name: cts_rpt,  path: stages/cts/reports/clock_tree.rpt, required: true }
+
+  # ===================== #5 Routing =====================
+  - id: route
+    name: Routing / 布线
+    steps:
+      # AI 决策步：executor=决策 skill（route-strategy 覆盖 global+detail）；
+      # harness/主 agent 跑 gen_decisions→render→run。决策：层分配·NDR·shielding。
+      - id: global_route
+        name: 全局布线 + track assignment（NDR / shielding）
+        executor: { type: skill, ref: route-strategy }
+        template: tcl/route/global_route.tcl.tmpl
+        decisions: stages/route/decisions/global_route.yaml
+        inputs:
+          - { name: cts_opt_def, path: stages/cts/artifacts/cts_opt.def, required: true }
+        outputs:
+          - { name: groute_def, path: stages/route/artifacts/groute.def, required: true }
+      # AI 决策步（route-strategy 第二分支）：NanoRoute 选项 + post-route 优化档位。
+      - id: detail_route
+        name: 详细布线（NanoRoute）+ post-route 优化
+        executor: { type: skill, ref: route-strategy }
+        template: tcl/route/detail_route.tcl.tmpl
+        decisions: stages/route/decisions/detail_route.yaml
+        inputs:
+          - { name: groute_def, path: stages/route/artifacts/groute.def, required: true }
+        outputs:
+          - { name: routed_def, path: stages/route/artifacts/routed.def, required: true }
+      # AI 决策步（route-drc-repair，agent→skill 迁移）：修哪些 DRC/antenna·怎么修。
+      # 末步产 gate 报告 drc.rpt（仿 import/cts），让 mock 写可解析 drc_violations 指标。
+      - id: drc_repair
+        name: DRC / antenna 修复（search & repair / 冗余 via）
+        executor: { type: skill, ref: route-drc-repair }
+        template: tcl/route/drc_repair.tcl.tmpl
+        decisions: stages/route/decisions/drc_repair.yaml
+        inputs:
+          - { name: routed_def, path: stages/route/artifacts/routed.def, required: true }
+        outputs:
+          - { name: routed_clean_def, path: stages/route/artifacts/routed_clean.def, required: true }
+          - { name: drc_rpt,          path: stages/route/reports/drc.rpt,            required: true }
+      - id: route_eval
+        name: Route gate（DRC / open / timing）
+        executor: { type: skill, ref: parse-eda-report }
+        gate: true
+        # gate 解析的报告 (.rpt) + spec/stages/route.yaml 指标（与 cts_eval 对齐）。
+        report: stages/route/reports/drc.rpt
+        inputs:
+          - { name: drc_rpt, path: stages/route/reports/drc.rpt, required: true }
+        outputs:
+          - { name: route_eval, path: stages/route/eval_result.yaml, required: true }
+      # 人工门：对布线结果做指标级签核（DRC / open / timing）。
+      - id: confirm_route_result
+        name: 人工确认布线结果（DRC / open / timing）
+        executor: { type: human }
+        instruction: >
+          审阅 route gate 的 eval_result（DRC violations / open / post-route 时序）。
+          确认布线可接受后 resolve-human 进入 timing ECO；否则手动修复后再继续。
+        inputs:
+          - { name: route_eval, path: stages/route/eval_result.yaml, required: true }
+          - { name: drc_rpt,    path: stages/route/reports/drc.rpt,  required: true }
+
+  # ===================== #6 Timing Closure / ECO =====================
+  - id: timing_eco
+    name: Timing Closure / 时序收敛 · ECO
+    steps:
+      - id: extract_rc
+        name: RC 抽取 → 生成 SPEF
+        executor: { type: skill, ref: run-eda-script }
+        template: tcl/timing_eco/extract_rc.tcl.tmpl
+        inputs:
+          - { name: routed_clean_def, path: stages/route/artifacts/routed_clean.def, required: true }
+        outputs:
+          - { name: spef, path: stages/timing_eco/artifacts/design.spef, required: true }
+      - id: signoff_sta
+        name: Signoff STA（全 corner/mode，含 SI）
+        executor: { type: skill, ref: run-eda-script }
+        template: tcl/timing_eco/signoff_sta.tcl.tmpl
+        inputs:
+          - { name: spef, path: stages/timing_eco/artifacts/design.spef, required: true }
+        outputs:
+          - { name: timing_rpt, path: stages/timing_eco/reports/timing.rpt, required: true }
+      # AI 决策步（timing-eco-design，agent→skill 迁移；最后一个 type:agent）：
+      # 决定修哪条路·手段(buffer/resize/useful skew/重布)。harness/主 agent 跑
+      # gen_decisions→render→run。注意：本步 output 是 eco.changes（ECO 变更清单
+      # 产物，非 .def，仿 cts.spec），下游 apply_eco 回放它。
+      - id: fix_strategy
+        name: 制定 setup/hold/功耗 ECO 修复策略
+        executor: { type: skill, ref: timing-eco-design }
+        template: tcl/timing_eco/fix_strategy.tcl.tmpl
+        decisions: stages/timing_eco/decisions/fix_strategy.yaml
+        inputs:
+          - { name: timing_rpt, path: stages/timing_eco/reports/timing.rpt, required: true }
+        outputs:
+          - { name: eco_changes, path: stages/timing_eco/artifacts/eco.changes, required: true }
+      - id: apply_eco
+        name: 应用 ECO（ecoPlace / ecoRoute）
+        executor: { type: skill, ref: run-eda-script }
+        template: tcl/timing_eco/apply_eco.tcl.tmpl
+        inputs:
+          - { name: eco_changes,      path: stages/timing_eco/artifacts/eco.changes,        required: true }
+          - { name: routed_clean_def, path: stages/route/artifacts/routed_clean.def,        required: true }
+        outputs:
+          - { name: eco_def,      path: stages/timing_eco/artifacts/eco.def,        required: true }
+          - { name: eco_timing_rpt, path: stages/timing_eco/reports/eco_timing.rpt, required: true }
+      - id: timing_eval
+        name: 时序收敛 gate（WNS / TNS / hold 全 view）
+        executor: { type: skill, ref: parse-eda-report }
+        gate: true
+        # gate 解析的报告是 apply_eco 产的 POST-ECO eco_timing.rpt（判最终时序），
+        # 不是 signoff_sta 的 pre-ECO timing.rpt + spec/stages/timing_eco.yaml 指标。
+        report: stages/timing_eco/reports/eco_timing.rpt
+        inputs:
+          - { name: eco_timing_rpt, path: stages/timing_eco/reports/eco_timing.rpt, required: true }
+        outputs:
+          - { name: timing_eval, path: stages/timing_eco/eval_result.yaml, required: true }
+      # 人工门：对时序收敛结果做指标级签核（WNS / TNS / hold）。
+      - id: confirm_timing_result
+        name: 人工确认时序收敛结果（WNS / TNS / hold）
+        executor: { type: human }
+        instruction: >
+          审阅 post-ECO 时序收敛 gate 的 eval_result（WNS / TNS / hold 全 view）。
+          确认时序签核可接受后 resolve-human 进入 signoff；否则回炉 ECO 后再继续。
+        inputs:
+          - { name: timing_eval,    path: stages/timing_eco/eval_result.yaml,       required: true }
+          - { name: eco_timing_rpt, path: stages/timing_eco/reports/eco_timing.rpt, required: true }
+
+  # ===================== #7 Signoff =====================
+  - id: signoff
+    name: Signoff / 物理验证
+    steps:
+      - id: metal_fill
+        name: Metal fill / dummy fill（density）
+        executor: { type: skill, ref: run-eda-script }
+        template: tcl/signoff/metal_fill.tcl.tmpl
+        inputs:
+          - { name: eco_def, path: stages/timing_eco/artifacts/eco.def, required: true }
+        outputs:
+          - { name: filled_def, path: stages/signoff/artifacts/filled.def, required: true }
+      - id: signoff_drc_lvs
+        name: Signoff DRC + LVS + antenna/ERC
+        executor: { type: skill, ref: run-eda-script }
+        template: tcl/signoff/signoff_drc_lvs.tcl.tmpl
+        inputs:
+          - { name: filled_def, path: stages/signoff/artifacts/filled.def, required: true }
+        outputs:
+          - { name: drc_lvs_rpt, path: stages/signoff/reports/drc_lvs.rpt, required: true }
+      - id: signoff_ir_em
+        name: Signoff IR-drop（static+dynamic）+ EM
+        executor: { type: skill, ref: run-eda-script }
+        template: tcl/signoff/signoff_ir_em.tcl.tmpl
+        inputs:
+          - { name: filled_def, path: stages/signoff/artifacts/filled.def, required: true }
+        outputs:
+          - { name: ir_em_rpt, path: stages/signoff/reports/ir_em.rpt, required: true }
+      - id: waiver_review
+        name: 人工 review violation 并判定 waiver
+        executor: { type: human }
+        instruction: >
+          审阅 signoff DRC/LVS/IR/EM 报告中的残余 violation，逐项判定可否 waiver。
+          确认签核结论后 resolve-human 继续。
+        inputs:
+          - { name: drc_lvs_rpt, path: stages/signoff/reports/drc_lvs.rpt, required: true }
+          - { name: ir_em_rpt,   path: stages/signoff/reports/ir_em.rpt,   required: true }
+      - id: signoff_eval
+        name: Signoff gate（DRC/LVS clean / IR/EM 达标）
+        executor: { type: skill, ref: parse-eda-report }
+        gate: true
+        # gate 解析的报告是 signoff_drc_lvs 产的 drc_lvs.rpt（含 drc_violations
+        # "total violations" 行）+ spec/stages/signoff.yaml 的 drc_violations{max:0}。
+        report: stages/signoff/reports/drc_lvs.rpt
+        inputs:
+          - { name: drc_lvs_rpt, path: stages/signoff/reports/drc_lvs.rpt, required: true }
+        outputs:
+          - { name: signoff_eval, path: stages/signoff/eval_result.yaml, required: true }
+
+  # ===================== #8 Tapeout =====================
+  - id: tapeout
+    name: Tapeout / GDS 交付
+    steps:
+      - id: chip_finishing
+        name: filler / seal ring / scribe line / dummy 收尾
+        executor: { type: skill, ref: run-eda-script }
+        template: tcl/tapeout/chip_finishing.tcl.tmpl
+        inputs:
+          - { name: filled_def, path: stages/signoff/artifacts/filled.def, required: true }
+        outputs:
+          - { name: final_def, path: stages/tapeout/artifacts/final.def, required: true }
+      - id: streamout
+        name: 输出 GDSII（streamOut）+ GDS merge
+        executor: { type: skill, ref: run-eda-script }
+        template: tcl/tapeout/streamout.tcl.tmpl
+        inputs:
+          - { name: final_def, path: stages/tapeout/artifacts/final.def, required: true }
+        outputs:
+          - { name: gds, path: stages/tapeout/artifacts/chip.gds, required: true }
+      - id: final_checklist
+        name: 人工 tapeout checklist 终审
+        executor: { type: human }
+        instruction: >
+          按 tapeout checklist 逐项核对（GDS 验证、交付物完整性、版本/工艺确认）。
+          全部通过后 resolve-human，流程完成。
+        inputs:
+          - { name: gds, path: stages/tapeout/artifacts/chip.gds, required: true }

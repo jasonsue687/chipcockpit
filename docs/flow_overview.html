@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>chip-backend-ai · 流程速览</title>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#1e293b; --panel2:#273449; --line:#334155;
+    --text:#e2e8f0; --muted:#94a3b8; --accent:#38bdf8; --accent2:#22d3ee;
+    --ok:#22c55e; --warn:#f59e0b; --err:#ef4444; --info:#a78bfa; --human:#f472b6;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"Segoe UI",Helvetica,"PingFang SC","Microsoft YaHei",sans-serif;
+       background:var(--bg);color:var(--text);line-height:1.6}
+  header{padding:24px 36px;background:linear-gradient(135deg,#0b1224 0%,#172554 100%);border-bottom:1px solid var(--line)}
+  header h1{margin:0;font-size:22px}
+  header p{margin:6px 0 0;color:var(--muted);font-size:13.5px}
+  header .meta{margin-top:10px;font-size:12px;color:var(--muted)}
+  header .meta span{display:inline-block;background:#0b1224;border:1px solid var(--line);padding:3px 10px;border-radius:12px;margin-right:6px}
+
+  nav.tabs{display:flex;flex-wrap:wrap;gap:6px;padding:12px 36px;background:#0b1224;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
+  nav.tabs button{background:transparent;color:var(--muted);border:1px solid transparent;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:13.5px;font-family:inherit}
+  nav.tabs button:hover{color:var(--text);background:#1e293b}
+  nav.tabs button.active{color:var(--accent);background:#0f1f3a;border-color:var(--accent)}
+
+  main{padding:28px 36px;max-width:1200px;margin:0 auto}
+  section{display:none;animation:fade .25s ease}
+  section.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  h2{font-size:19px;border-left:4px solid var(--accent);padding-left:12px;margin-top:0}
+  h3{font-size:15.5px;color:var(--accent2);margin-top:24px}
+  p{color:#cbd5e1;margin:10px 0}
+
+  .grid{display:grid;gap:14px}
+  .grid.cols-2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+  .grid.cols-3{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;transition:.2s}
+  .card:hover{border-color:var(--accent)}
+  .card h4{margin:0 0 8px;color:var(--accent);font-size:14.5px}
+  .card .tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;background:#334155;color:var(--text);margin-right:4px}
+  .tag.ok{background:#14532d;color:#bbf7d0}
+  .tag.warn{background:#7c2d12;color:#fed7aa}
+  .tag.info{background:#3730a3;color:#c7d2fe}
+  .tag.human{background:#831843;color:#fbcfe8}
+  .tag.err{background:#7f1d1d;color:#fecaca}
+
+  pre{background:#0b1224;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;font-size:12.5px;line-height:1.55;color:#cbd5e1}
+  code{font-family:"SF Mono",Consolas,monospace;color:#fbbf24}
+  pre code{color:#cbd5e1}
+  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:13.5px}
+  th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  th{background:#0b1224;color:var(--accent2);font-weight:600}
+  tr:hover td{background:#1a2540}
+
+  /* FSM diagram */
+  .fsm{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin:18px 0;padding:16px;background:var(--panel);border-radius:10px;border:1px solid var(--line)}
+  .fsm .node{background:#0b1224;border:2px solid var(--line);border-radius:8px;padding:10px 8px;text-align:center;font-size:12px;cursor:pointer;transition:.2s;user-select:none}
+  .fsm .node:hover{border-color:var(--accent);background:#0f1f3a}
+  .fsm .node.active{border-color:var(--accent);background:#0f1f3a;color:var(--accent);box-shadow:0 0 12px rgba(56,189,248,.35)}
+  .fsm .node b{display:block;font-size:13px;margin-bottom:3px;letter-spacing:.3px}
+  .fsm .node.terminal{border-color:#3f3f46}
+  .fsm .node.human-gate{border-color:var(--human)}
+  .fsm .node .desc{color:var(--muted);font-size:10.5px;line-height:1.4}
+  .fsm-detail{background:#0b1224;border:1px solid var(--accent);border-radius:8px;padding:14px 16px;margin-top:8px;min-height:120px}
+  .fsm-detail h4{margin:0 0 10px;color:var(--accent)}
+  .fsm-detail .empty{color:var(--muted);font-style:italic}
+
+  /* tree */
+  .tree{font-family:"SF Mono",Consolas,monospace;font-size:13px;line-height:1.7;background:#0b1224;border:1px solid var(--line);border-radius:8px;padding:14px 18px}
+  .tree .dir{color:var(--accent2)}
+  .tree .file{color:#cbd5e1}
+  .tree .cmt{color:#64748b}
+
+  /* runtime loop steps */
+  .phase{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-bottom:12px;overflow:hidden}
+  .phase summary{cursor:pointer;padding:14px 18px;list-style:none;display:flex;align-items:center;justify-content:space-between;background:#13243f}
+  .phase summary::-webkit-details-marker{display:none}
+  .phase summary:hover{background:#162d4f}
+  .phase summary .left{display:flex;align-items:center;gap:12px}
+  .phase summary .badge{background:#0b1224;color:var(--accent);border:1px solid var(--accent);padding:3px 10px;border-radius:12px;font-size:11.5px;font-weight:600}
+  .phase summary .title{font-weight:600;font-size:14.5px}
+  .phase summary .arrow{color:var(--muted);transition:transform .2s}
+  .phase[open] summary .arrow{transform:rotate(90deg)}
+  .phase .body{padding:14px 20px 18px 20px;border-top:1px solid var(--line)}
+
+  /* pill list */
+  .pill-list{list-style:none;padding:0;margin:8px 0}
+  .pill-list li{padding:8px 12px;background:#0b1224;border-left:3px solid var(--accent);border-radius:4px;margin-bottom:6px;font-size:13.5px}
+  .pill-list li.human{border-left-color:var(--human)}
+  .pill-list li.warn{border-left-color:var(--warn)}
+
+  /* decision flow */
+  .decision-tree{background:#0b1224;border:1px solid var(--line);border-radius:8px;padding:14px 18px;font-family:"SF Mono",Consolas,monospace;font-size:13px;line-height:1.85;white-space:pre-wrap;color:#cbd5e1}
+  .decision-tree .kw{color:#fbbf24}
+  .decision-tree .br{color:var(--accent)}
+  .decision-tree .ok{color:#bbf7d0}
+  .decision-tree .er{color:#fecaca}
+
+  /* agent card */
+  .agent-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;transition:.2s}
+  .agent-card:hover{border-color:var(--accent2)}
+  .agent-card .title{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .agent-card .title h4{margin:0;color:var(--accent);font-size:15px}
+  .agent-card .role{color:var(--muted);font-size:12.5px;margin-bottom:10px}
+  .agent-card details{margin-top:8px;border-top:1px dashed var(--line);padding-top:8px}
+  .agent-card details summary{cursor:pointer;color:var(--accent2);font-size:13px;list-style:none}
+  .agent-card details summary::before{content:"▸ ";color:var(--muted)}
+  .agent-card details[open] summary::before{content:"▾ "}
+  .agent-card .kv{display:grid;grid-template-columns:90px 1fr;gap:4px 12px;font-size:12.5px;margin-top:8px}
+  .agent-card .kv .k{color:var(--muted)}
+  .agent-card .kv .v{color:#cbd5e1}
+
+  footer{padding:20px 36px;text-align:center;color:var(--muted);font-size:12px;border-top:1px solid var(--line);margin-top:30px}
+  a{color:var(--accent2)}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>chip-backend-ai · 流程速览</h1>
+  <p>从模糊目标到流片前 PPA 收敛的端到端自治流程 · 一页看完整套设计</p>
+  <div class="meta">
+    <span>Master Plan V3</span>
+    <span>状态机驱动</span>
+    <span>Human-in-the-loop Spec</span>
+    <span>Filesystem Handoff</span>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button data-tab="overview" class="active">5 分钟概览</button>
+  <button data-tab="fsm">状态机</button>
+  <button data-tab="loop">运行时闭环</button>
+  <button data-tab="agents">Agent 矩阵</button>
+  <button data-tab="workspace">Workspace &amp; 落盘协议</button>
+  <button data-tab="decisions">编排器决策</button>
+</nav>
+
+<main>
+
+<!-- ===================== 5 分钟概览 ===================== -->
+<section id="overview" class="active">
+  <h2>这套系统在做什么</h2>
+  <p>一个<b>高自治</b>的芯片后端设计 AI 控制系统：把人类的模糊目标（如<i>"跑通这个 block 的 route，congestion 别爆，时序稍微超一点没关系"</i>）拆成可度量的 Spec，由编排器调度 Sub-agent 跑完 Floorplan → CTS → Route，遇到问题自己重试/回滚/改 Spec，关键节点要人审批。</p>
+
+  <div class="grid cols-3">
+    <div class="card">
+      <h4>三条核心设计选择</h4>
+      <p style="margin:6px 0;font-size:13px;color:#cbd5e1">① <b>编排器是唯一决策中枢</b>，Sub-agent 只干活不调度<br>
+      ② <b>所有交接走文件系统</b>，禁止内存传海量上下文<br>
+      ③ <b>Spec 是宪法</b>，落盘前必须人类审批</p>
+    </div>
+    <div class="card">
+      <h4>谁在干活</h4>
+      <p style="margin:6px 0;font-size:13px;color:#cbd5e1">
+        <span class="tag info">Orchestrator</span> 读状态/选路由/记日志<br>
+        <span class="tag">Spec Agent</span> 意图 → YAML 契约<br>
+        <span class="tag">Floorplan / CTS / Route</span> 三大主阶段<br>
+        <span class="tag warn">Timing ECO</span> 按需修时序/DRC<br>
+        <span class="tag human">Human</span> 审批 Spec、做最终拍板
+      </p>
+    </div>
+    <div class="card">
+      <h4>怎么知道结束了</h4>
+      <p style="margin:6px 0;font-size:13px;color:#cbd5e1">
+        <span class="tag ok">COMPLETED</span> 所有阶段 eval pass，命中 spec 中的 termination_criteria<br>
+        <span class="tag err">ABORTED</span> 全局重试预算耗尽 / 不可恢复错误
+      </p>
+    </div>
+  </div>
+
+  <h3>一图速览：从模糊目标到流片前</h3>
+  <pre style="line-height:1.5;color:#cbd5e1;font-size:12.5px"><code>     [Human 模糊目标]
+            │
+            ▼
+   ┌──────────────────┐
+   │   Spec Agent     │  ←──────┐  (revise_spec 唤醒)
+   │ 意图 → YAML 契约 │         │
+   └──────────────────┘         │
+            │                   │
+            ▼                   │
+       [Human 审批]             │
+            │                   │
+            ▼                   │
+   ┌──────────────────────────────────────┐
+   │            Orchestrator              │
+   │   读 spec / state / eval_result      │
+   │   → dispatch | retry | rollback      │
+   │   → revise_spec | complete | abort   │
+   └──────────────────────────────────────┘
+       │           │           │
+       ▼           ▼           ▼
+  ┌────────┐  ┌────────┐  ┌────────┐    ┌──────────────┐
+  │FLOORPLN│  │  CTS   │  │ ROUTE  │ ⇢  │  Timing ECO  │
+  │_meta   │  │_meta   │  │_meta   │    │ (按需触发)   │
+  │eval_*  │→ │eval_*  │→ │eval_*  │    └──────────────┘
+  │artifact│  │artifact│  │artifact│
+  └────────┘  └────────┘  └────────┘
+       │           │           │
+       └───── 落盘到 workspace/stages/&lt;stage&gt;/run_NNN/ ─────┘</code></pre>
+
+  <h3>怎么入门读这份文档</h3>
+  <ul class="pill-list">
+    <li>没用过这套系统 → 看 <b>5 分钟概览</b> 和 <b>状态机</b> 两栏就够。</li>
+    <li>想跑一遍 → 看 <b>运行时闭环</b>，每个 Phase 可展开命令。</li>
+    <li>调 Agent / 改 Spec → 看 <b>Agent 矩阵</b> 和 <b>Workspace 协议</b>。</li>
+    <li>排查 orchestrator 为什么这么选 → 看 <b>编排器决策</b>。</li>
+  </ul>
+</section>
+
+<!-- ===================== 状态机 ===================== -->
+<section id="fsm">
+  <h2>全局状态机（点节点看转移规则）</h2>
+  <p>真源在 <code>plugins/chip-backend-ai/core/workflow/state_manager.py:17</code> 的 <code>TRANSITIONS</code> 字典。编排器和 Sub-agent 都不能绕过这里直接改 <code>state/machine.yaml</code>。</p>
+
+  <div class="fsm" id="fsmGrid">
+    <div class="node" data-state="INIT"><b>INIT</b><div class="desc">workspace 创建完，等模糊目标</div></div>
+    <div class="node" data-state="SPEC_DRAFTING"><b>SPEC_DRAFTING</b><div class="desc">Spec Agent 在生成/修订</div></div>
+    <div class="node human-gate" data-state="SPEC_REVIEW"><b>SPEC_REVIEW</b><div class="desc">⏸ 等人类审批</div></div>
+    <div class="node" data-state="SCHEDULING"><b>SCHEDULING</b><div class="desc">编排器读盘思考（中枢）</div></div>
+    <div class="node" data-state="STAGE_RUNNING"><b>STAGE_RUNNING</b><div class="desc">某个 Sub-agent 在执行</div></div>
+    <div class="node terminal" data-state="COMPLETED"><b>COMPLETED</b><div class="desc">✓ 所有阶段通过</div></div>
+    <div class="node terminal" data-state="ABORTED"><b>ABORTED</b><div class="desc">✗ 预算耗尽 / 不可恢复</div></div>
+  </div>
+
+  <div id="fsmDetail" class="fsm-detail">
+    <div class="empty">点上面任意状态节点查看：合法事件、目标状态、典型触发场景。</div>
+  </div>
+
+  <h3>完整事件表</h3>
+  <table>
+    <thead><tr><th>当前状态</th><th>事件</th><th>目标状态</th><th>触发条件</th></tr></thead>
+    <tbody>
+      <tr><td><code>INIT</code></td><td><code>human_input</code></td><td><code>SPEC_DRAFTING</code></td><td>人类提供模糊目标</td></tr>
+      <tr><td><code>SPEC_DRAFTING</code></td><td><code>spec_ready</code></td><td><code>SPEC_REVIEW</code></td><td>Spec Agent 完成草稿</td></tr>
+      <tr><td><code>SPEC_REVIEW</code></td><td><code>human_approved</code></td><td><code>SCHEDULING</code></td><td>人类审批通过</td></tr>
+      <tr><td><code>SPEC_REVIEW</code></td><td><code>human_rejected</code></td><td><code>SPEC_DRAFTING</code></td><td>人类要求修改</td></tr>
+      <tr><td><code>SCHEDULING</code></td><td><code>dispatch</code></td><td><code>STAGE_RUNNING</code></td><td>编排器选定 Sub-agent 唤醒</td></tr>
+      <tr><td><code>SCHEDULING</code></td><td><code>revise_spec</code></td><td><code>SPEC_DRAFTING</code></td><td>编排器判定 Spec 不可达</td></tr>
+      <tr><td><code>SCHEDULING</code></td><td><code>all_passed</code></td><td><code>COMPLETED</code></td><td>所有阶段通过 spec 终止条件</td></tr>
+      <tr><td><code>SCHEDULING</code></td><td><code>budget_exhausted</code></td><td><code>ABORTED</code></td><td>全局重试预算耗尽</td></tr>
+      <tr><td><code>STAGE_RUNNING</code></td><td><code>agent_done</code></td><td><code>SCHEDULING</code></td><td>Sub-agent 落盘完成休眠</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ===================== 运行时闭环 ===================== -->
+<section id="loop">
+  <h2>端到端闭环（点 Phase 展开）</h2>
+  <p>编排器（<code>skills/run-chip-flow/SKILL.md</code>）按 Phase 0 → F 顺序推进。每个 Phase 都对应一条或多条 CLI 命令 + 一次状态机转移。</p>
+
+  <details class="phase" open>
+    <summary><span class="left"><span class="badge">Phase 0</span><span class="title">环境准备 · 找到 Innovus</span></span><span class="arrow">›</span></summary>
+    <div class="body">
+      <p>每台机器一次性配置。配置存在 <code>~/.chip-backend-ai/env.json</code>，跨项目共享。</p>
+      <pre><code># 检查 (退出码: 0=ok, 1=路径失效, 2=未配置)
+python3 ${CLAUDE_PLUGIN_ROOT}/core/env/env_manager.py check --tool innovus
+
+# 自动探测 (PATH / 环境变量 / 常见安装路径)
+python3 ${CLAUDE_PLUGIN_ROOT}/core/env/env_manager.py detect --save
+
+# 手动设置
+python3 ${CLAUDE_PLUGIN_ROOT}/core/env/env_manager.py set --tool innovus --path /opt/cadence/INNOVUS221/bin/innovus</code></pre>
+      <p style="color:var(--muted);font-size:12.5px">resume 时会再跑一次 check —— Innovus 可能已经被升级/搬路径。</p>
+    </div>
+  </details>
+
+  <details class="phase">
+    <summary><span class="left"><span class="badge">Phase A</span><span class="title">工作区初始化 · INIT</span></span><span class="arrow">›</span></summary>
+    <div class="body">
+      <p>默认在当前目录下创建隐藏目录 <code>./.chipflow/</code>（已存在则 <code>.chipflow_2</code> 自增）。<b>不要让用户挑路径</b>，除非他明确要求。</p>
+      <pre><code># 默认（推荐）
+python3 ${CLAUDE_PLUGIN_ROOT}/core/workflow/workspace.py init
+
+# 自定义路径
+python3 ${CLAUDE_PLUGIN_ROOT}/core/workflow/workspace.py init --path &lt;parent&gt; --name &lt;custom&gt;</code></pre>
+    </div>
+  </details>
+
+  <details class="phase">
+    <summary><span class="left"><span class="badge">Phase B</span><span class="title">Spec 生成 · INIT → SPEC_DRAFTING → SPEC_REVIEW</span></span><span class="arrow">›</span></summary>
+    <div class="body">
+      <p>关键的人类协作点。<b>未审批通过的 Spec 不允许后续任何 Sub-agent 工作。</b></p>
+      <ol class="pill-list">
+        <li>向用户索取模糊目标 → 转移 <code>human_input</code></li>
+        <li>Agent 调用：<code>chip-backend-ai:spec-agent</code>，scenario=<code>initial</code></li>
+        <li>Spec Agent 写出 <code>spec/global_spec.yaml</code> 和 <code>spec/stages/*.yaml</code></li>
+        <li>转移 <code>spec_ready</code>，把 spec 内容呈现给用户</li>
+        <li class="human">人类批准 → <code>human_approved</code> + 写 <code>spec_version=v1</code></li>
+        <li class="warn">人类拒绝 → <code>human_rejected</code>，带反馈再唤醒 Spec Agent，scenario=<code>adjustment</code></li>
+      </ol>
+    </div>
+  </details>
+
+  <details class="phase">
+    <summary><span class="left"><span class="badge">Phase C</span><span class="title">调度循环 · SCHEDULING</span></span><span class="arrow">›</span></summary>
+    <div class="body">
+      <p>编排器的核心思考循环。每轮做三件事：读最新 eval_result、按决策树选 action、写一条 <code>decisions.jsonl</code>。详细决策逻辑见 <b>编排器决策</b> 一栏。</p>
+      <pre><code># 每轮三连
+python3 ${CLAUDE_PLUGIN_ROOT}/core/workflow/state_manager.py read --workspace &lt;ws&gt;
+python3 ${CLAUDE_PLUGIN_ROOT}/core/workflow/state_manager.py check-budget --workspace &lt;ws&gt;
+python3 ${CLAUDE_PLUGIN_ROOT}/core/workflow/decision_logger.py log --workspace &lt;ws&gt; ...</code></pre>
+    </div>
+  </details>
+
+  <details class="phase">
+    <summary><span class="left"><span class="badge">Phase D</span><span class="title">阶段执行 · SCHEDULING → STAGE_RUNNING</span></span><span class="arrow">›</span></summary>
+    <div class="body">
+      <p>创建 run 目录 → 转移 <code>dispatch</code> → Agent 调用 → 读 <code>eval_result.yaml</code> → 转移 <code>agent_done</code> → 回 Phase C。</p>
+      <pre><code>python3 ${CLAUDE_PLUGIN_ROOT}/core/workflow/workspace.py create-run --workspace &lt;ws&gt; --stage floorplan
+python3 ${CLAUDE_PLUGIN_ROOT}/core/workflow/state_manager.py transition --workspace &lt;ws&gt; --event dispatch --detail "..."
+
+Agent({
+  subagent_type: "chip-backend-ai:floorplan-agent:Floorplan Agent",
+  prompt: "Workspace: ...\nRun directory: ...\nSpec version: ...\nStage spec: ..."
+})
+
+# 回收：
+python3 ${CLAUDE_PLUGIN_ROOT}/core/workflow/state_manager.py update-stage --workspace &lt;ws&gt; \
+  --stage floorplan --status passed --run-id run_001 --eval-path stages/floorplan/run_001/eval_result.yaml
+python3 ${CLAUDE_PLUGIN_ROOT}/core/workflow/state_manager.py transition --workspace &lt;ws&gt; --event agent_done --detail "..."</code></pre>
+      <p style="color:var(--warn);font-size:12.5px">⚠ 当前 CTS/Route/Timing ECO 仍是模拟模式，<code>eval_result.yaml</code> 里会带 <code>simulated: true</code> —— 务必在汇报时明示用户，不要拿假数据当真 PPA。</p>
+    </div>
+  </details>
+
+  <details class="phase">
+    <summary><span class="left"><span class="badge">Phase E</span><span class="title">Spec 修订 · SCHEDULING → SPEC_DRAFTING</span></span><span class="arrow">›</span></summary>
+    <div class="body">
+      <p>同一阶段反复失败、约束看起来真的不可达时触发。流程和 Phase B 类似，区别是给 Spec Agent 喂 scenario=<code>revision</code> + 失败 eval 数据。</p>
+      <ul class="pill-list">
+        <li>修订后旧 Spec 进入 <code>spec/history/global_spec_vN.yaml</code>，<code>spec_version</code> 递增</li>
+        <li>新 Spec 仍要走一次人类审批</li>
+        <li>已完成阶段的 eval 是否被新 Spec "翻盘" 由编排器重新判断</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="phase">
+    <summary><span class="left"><span class="badge">Phase F</span><span class="title">收尾 · COMPLETED / ABORTED</span></span><span class="arrow">›</span></summary>
+    <div class="body">
+      <table>
+        <thead><tr><th>终态</th><th>说明</th><th>需要汇报给用户什么</th></tr></thead>
+        <tbody>
+          <tr><td><span class="tag ok">COMPLETED</span></td><td>所有阶段通过，命中 termination_criteria</td><td>各阶段 PPA 摘要、workspace 路径、可交付 artifact 列表</td></tr>
+          <tr><td><span class="tag err">ABORTED</span></td><td>重试预算耗尽或不可恢复错误</td><td>失败原因、预算消耗情况、最后一次 eval、可能的人工干预建议</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+</section>
+
+<!-- ===================== Agent 矩阵 ===================== -->
+<section id="agents">
+  <h2>Agent 矩阵（点 Agent 看 I/O 契约）</h2>
+  <p>所有 Sub-agent 遵循同一生命周期：<code>唤醒 → 读 Spec + 上游落盘 → 执行 → 自评估 → 落盘 → 休眠</code>。Spec Agent 是特殊在落盘前要人审批，但在调度接口上和其他 agent 完全一致。</p>
+
+  <div class="grid cols-2">
+
+    <div class="agent-card">
+      <div class="title"><h4>Spec Agent</h4><span class="tag human">人类审批</span></div>
+      <div class="role">把模糊目标翻译成可度量的 YAML 契约。运行中也负责修订。</div>
+      <details>
+        <summary>输入 / 输出</summary>
+        <div class="kv">
+          <div class="k">subagent_type</div><div class="v"><code>chip-backend-ai:spec-agent:Spec Agent</code></div>
+          <div class="k">输入</div><div class="v">workspace · scenario(initial/revision/adjustment) · human_goal · context</div>
+          <div class="k">产出</div><div class="v"><code>spec/global_spec.yaml</code><br><code>spec/stages/{floorplan,cts,route}.yaml</code></div>
+          <div class="k">关键约束</div><div class="v">原文保留 human_goal · 每个指标必须能映射到 EDA 数字 · 落盘后仍是 draft，需人类批准</div>
+        </div>
+      </details>
+    </div>
+
+    <div class="agent-card">
+      <div class="title"><h4>Floorplan Agent</h4><span class="tag">主阶段 #1</span></div>
+      <div class="role">宏单元摆放、电源网络规划、初始物理布局质量评估。</div>
+      <details>
+        <summary>输入 / 输出 / 指标</summary>
+        <div class="kv">
+          <div class="k">subagent_type</div><div class="v"><code>chip-backend-ai:floorplan-agent:Floorplan Agent</code></div>
+          <div class="k">输入</div><div class="v">workspace · run_dir · spec_version · <code>spec/stages/floorplan.yaml</code></div>
+          <div class="k">产出</div><div class="v"><code>artifacts/floorplan.tcl</code> · <code>reports/*.rpt</code> · <code>_meta.yaml</code> · <code>eval_result.yaml</code> · <code>checkpoints/post_floorplan_*.def</code></div>
+          <div class="k">核心指标</div><div class="v">utilization · congestion_hotspot · macro_channel_width_um · power_grid_ir_drop</div>
+          <div class="k">建议字段</div><div class="v">proceed / retry / escalate（rollback 不适用，它是第一阶段）</div>
+        </div>
+      </details>
+    </div>
+
+    <div class="agent-card">
+      <div class="title"><h4>CTS Agent</h4><span class="tag">主阶段 #2</span><span class="tag warn">simulated</span></div>
+      <div class="role">时钟树综合、skew 平衡、buffer 插入、post-CTS 时序检查。</div>
+      <details>
+        <summary>输入 / 输出 / 指标</summary>
+        <div class="kv">
+          <div class="k">subagent_type</div><div class="v"><code>chip-backend-ai:cts-agent:CTS Agent</code></div>
+          <div class="k">输入</div><div class="v">workspace · run_dir · spec_version · upstream checkpoint(post-floorplan) · <code>spec/stages/cts.yaml</code></div>
+          <div class="k">产出</div><div class="v"><code>artifacts/cts.tcl</code> · clock_trees / skew / timing reports · <code>_meta + eval_result</code></div>
+          <div class="k">核心指标</div><div class="v">clock_skew · insertion_delay · max_transition · buffer_count · setup_wns · hold_wns</div>
+          <div class="k">当前状态</div><div class="v">EDA 未接入，走 <code>stage_simulator.py</code>，<code>eval_result.simulated=true</code></div>
+        </div>
+      </details>
+    </div>
+
+    <div class="agent-card">
+      <div class="title"><h4>Route Agent</h4><span class="tag">主阶段 #3</span><span class="tag warn">simulated</span></div>
+      <div class="role">全局/详细绕线、拥塞消解、DRC 修复、绕线质量评估。</div>
+      <details>
+        <summary>输入 / 输出 / 指标</summary>
+        <div class="kv">
+          <div class="k">subagent_type</div><div class="v"><code>chip-backend-ai:route-agent:Route Agent</code></div>
+          <div class="k">输入</div><div class="v">workspace · run_dir · spec_version · upstream checkpoint(post-cts) · <code>spec/stages/route.yaml</code></div>
+          <div class="k">产出</div><div class="v"><code>artifacts/route.tcl</code> · congestion / drc / timing reports · <code>_meta + eval_result</code></div>
+          <div class="k">核心指标</div><div class="v">congestion_overflow · drc_violations · total_wire_length · via_count</div>
+          <div class="k">当前状态</div><div class="v">走 stage_simulator，同 CTS</div>
+        </div>
+      </details>
+    </div>
+
+    <div class="agent-card">
+      <div class="title"><h4>Timing ECO Agent</h4><span class="tag info">按需触发</span><span class="tag warn">simulated</span></div>
+      <div class="role">局部修 setup/hold、DRC、做增量优化，不破坏整体设计质量。</div>
+      <details>
+        <summary>输入 / 输出 / 触发场景</summary>
+        <div class="kv">
+          <div class="k">subagent_type</div><div class="v"><code>chip-backend-ai:timing-eco-agent:Timing ECO Agent</code></div>
+          <div class="k">输入</div><div class="v">workspace · run_dir · spec_version · 任一阶段后的 checkpoint</div>
+          <div class="k">何时唤醒</div><div class="v">CTS / Route 完成后仍有少量 timing/DRC 违例，且未到 rollback 程度</div>
+          <div class="k">特殊点</div><div class="v">spec 文件 <code>spec/stages/timing_eco.yaml</code> 是可选的，缺失时模拟器给最小通过结果</div>
+        </div>
+      </details>
+    </div>
+
+    <div class="agent-card">
+      <div class="title"><h4>Orchestrator</h4><span class="tag info">非 Sub-agent</span></div>
+      <div class="role">Run Chip Flow Skill 本身。系统唯一的决策中枢，所有 Sub-agent 由它调度。</div>
+      <details>
+        <summary>它做什么 / 不做什么</summary>
+        <div class="kv">
+          <div class="k">做</div><div class="v">读状态 · 选 Sub-agent · 转移状态机 · 写决策日志 · 跨阶段归因 · 触发 rollback</div>
+          <div class="k">不做</div><div class="v">不动 Tcl · 不评估指标 · 不直接读 EDA 报告 · 不修改 Spec 内容（修订要派 Spec Agent）</div>
+          <div class="k">入口</div><div class="v"><code>plugins/chip-backend-ai/skills/run-chip-flow/SKILL.md</code></div>
+        </div>
+      </details>
+    </div>
+
+  </div>
+</section>
+
+<!-- ===================== Workspace ===================== -->
+<section id="workspace">
+  <h2>工作区目录结构</h2>
+  <p>每次启动新任务创建一个隔离的 workspace。<b>只增不删</b>：Spec 主文件可覆写但旧版本归档到 <code>history/</code>；run 目录永不回收。</p>
+
+  <div class="tree">
+<span class="dir">workspace/</span>
+├── <span class="dir">spec/</span>
+│   ├── <span class="file">global_spec.yaml</span>              <span class="cmt"># 当前生效的全局 Spec</span>
+│   ├── <span class="dir">stages/</span>
+│   │   ├── <span class="file">floorplan.yaml</span>            <span class="cmt"># floorplan 阶段约束</span>
+│   │   ├── <span class="file">cts.yaml</span>
+│   │   └── <span class="file">route.yaml</span>
+│   └── <span class="dir">history/</span>                       <span class="cmt"># Spec 变更历史（append-only）</span>
+│       ├── <span class="file">global_spec_v1.yaml</span>
+│       └── <span class="file">global_spec_v2.yaml</span>
+│
+├── <span class="dir">state/</span>
+│   ├── <span class="file">machine.yaml</span>                  <span class="cmt"># 全局状态机快照（编排器读写）</span>
+│   └── <span class="file">decisions.jsonl</span>               <span class="cmt"># 决策日志（append-only）</span>
+│
+├── <span class="dir">stages/</span>
+│   ├── <span class="dir">floorplan/</span>
+│   │   ├── <span class="dir">run_001/</span>
+│   │   │   ├── <span class="file">_meta.yaml</span>            <span class="cmt"># run 元数据 → 编排器索引入口</span>
+│   │   │   ├── <span class="file">eval_result.yaml</span>      <span class="cmt"># 自评估结果（带原始数值）</span>
+│   │   │   ├── <span class="dir">artifacts/</span>             <span class="cmt"># Tcl / 约束文件</span>
+│   │   │   └── <span class="dir">reports/</span>               <span class="cmt"># EDA 原始 report</span>
+│   │   └── <span class="dir">run_002/</span>                   <span class="cmt"># 重试新 run，旧 run 不动</span>
+│   ├── <span class="dir">cts/</span>
+│   │   └── <span class="dir">run_001/</span>
+│   └── <span class="dir">route/</span>
+│       └── <span class="dir">run_001/</span>
+│
+└── <span class="dir">checkpoints/</span>                       <span class="cmt"># DEF/DB 快照（回滚恢复点）</span>
+    ├── <span class="file">post_floorplan_run001.def</span>
+    └── <span class="file">post_cts_run001.def</span>
+  </div>
+
+  <h2 style="margin-top:32px">三份 YAML 契约</h2>
+  <p>Sub-agent 和编排器之间<b>只通过这三类文件</b>通信。模板在 <code>plugins/chip-backend-ai/templates/</code> —— 改字段先改模板，不要在协议外手搓字段。</p>
+
+  <div class="grid cols-2">
+    <div class="card">
+      <h4>① _meta.yaml · run 元数据</h4>
+      <pre><code>agent: floorplan_agent
+stage: floorplan
+run_id: run_001
+timestamp: "2026-04-12T14:30:00Z"
+spec_version: v2
+parent_run: null          # 回滚后重跑指向触发 run
+status: completed         # running | completed | failed
+checkpoint: checkpoints/post_floorplan_run001.def</code></pre>
+    </div>
+    <div class="card">
+      <h4>② eval_result.yaml · 自评估</h4>
+      <pre><code>stage: floorplan
+run_id: run_001
+spec_version: v2
+overall: pass             # pass | fail | partial
+
+metrics:
+  - name: utilization
+    target: { min: 0.65, max: 0.75 }
+    actual: 0.71
+    status: pass
+
+recommendation: proceed   # proceed | retry | rollback | escalate
+retry_context: null
+escalation_reason: null</code></pre>
+    </div>
+    <div class="card" style="grid-column:1/-1">
+      <h4>③ decisions.jsonl · 编排器决策日志（append-only）</h4>
+      <pre><code>{"ts":"2026-04-12T14:35:00Z","from":"SCHEDULING","to":"STAGE_RUNNING","action":"dispatch","target":"floorplan_agent","run_id":"run_001","reason":"Initial floorplan execution per spec v1"}
+{"ts":"2026-04-12T15:10:00Z","from":"SCHEDULING","to":"STAGE_RUNNING","action":"retry","target":"floorplan_agent","run_id":"run_002","reason":"run_001 congestion 0.91 > threshold 0.85"}
+{"ts":"2026-04-12T15:45:00Z","from":"SCHEDULING","to":"SPEC_DRAFTING","action":"revise_spec","reason":"floorplan run_002 still failing, utilization target may be too aggressive"}</code></pre>
+    </div>
+  </div>
+
+  <h3>协议红线</h3>
+  <ul class="pill-list">
+    <li><b>metrics 必含 target + actual</b>，禁止只输出 pass/fail —— 编排器要能独立复核，Spec 改动后还要能"翻盘"老 eval。</li>
+    <li><b>Sub-agent 只评估本阶段</b>。"floorplan 摆放是否导致 routing 拥塞" 这类跨阶段归因，编排器干。</li>
+    <li><b>Sub-agent 不写 <code>state/machine.yaml</code></b>。状态机只能由编排器经 <code>state_manager.transition()</code> 写。</li>
+    <li><b>run 目录永远不删</b>。重试就 <code>run_002/</code>，回滚也保留触发 run 作为审计链。</li>
+  </ul>
+</section>
+
+<!-- ===================== 编排器决策 ===================== -->
+<section id="decisions">
+  <h2>编排器在 SCHEDULING 时怎么选下一步</h2>
+  <p>每轮 SCHEDULING 的核心是<b>读最新一份 eval_result.yaml + 当前阶段重试预算 + 全局预算</b>，套下面这棵决策树。</p>
+
+  <div class="decision-tree"><span class="kw">读</span> state/machine.yaml （当前状态全貌）
+<span class="kw">读</span> 最近一次 run 的 eval_result.yaml
+
+<span class="br">┌─ IF</span> 还没跑过任何阶段（全部 pending）
+│      → <span class="ok">dispatch 第一个阶段（floorplan）</span>
+│
+<span class="br">├─ IF</span> eval.overall == <span class="ok">pass</span>
+│      <span class="br">├─</span> 满足 termination_criteria → <span class="ok">all_passed → COMPLETED</span>
+│      <span class="br">└─</span> 否则 → <span class="ok">dispatch 下一个 pending 阶段</span>
+│
+<span class="br">├─ IF</span> eval.overall == <span class="er">fail</span>
+│      <span class="br">├─</span> 阶段 retry_count &lt; max_stage_retries → <span class="ok">retry 同阶段（run+1）</span>
+│      <span class="br">├─</span> eval.recommendation == <span class="er">rollback</span> → <span class="ok">dispatch 更早阶段，parent_run 指向当前失败 run</span>
+│      <span class="br">├─</span> 全局预算耗尽 → <span class="er">budget_exhausted → ABORTED</span>
+│      <span class="br">└─</span> 否则 → <span class="ok">revise_spec（派 Spec Agent，等人重审）</span>
+│
+<span class="br">└─ IF</span> eval.overall == <span class="kw">partial</span>
+       <span class="br">├─</span> 失败指标不阻塞下游 → <span class="ok">proceed</span>
+       <span class="br">└─</span> 阻塞 → 按 <span class="er">fail</span> 分支处理</div>
+
+  <h3>跨阶段回滚怎么走</h3>
+  <ol class="pill-list">
+    <li>识别哪个上游阶段的产物可能造成下游失败（编排器跨阶段归因，Sub-agent 不参与）。</li>
+    <li>从 <code>checkpoints/</code> 加载对应的上游 checkpoint。</li>
+    <li>在上游阶段创建新 run，<code>parent_run</code> 指向当前失败 run（保留审计链）。</li>
+    <li>全局重试预算 +1。</li>
+  </ol>
+
+  <h3>失败注入（用于离线调试编排逻辑）</h3>
+  <p style="color:#cbd5e1">EDA 没接入前，所有阶段 agent 默认走通过路径。要测试 retry / rollback / revise_spec / abort 分支时，在用户提示中触发<b>失败计划</b>，编排器在 dispatch prompt 里附加：</p>
+  <pre><code>Simulate fail: true
+Fail metrics: clock_skew, max_transition       # 可选，省略则全部失败
+Recommendation: retry|rollback|escalate|proceed
+Escalation reason: &lt;text&gt;                      # 仅 escalate 时</code></pre>
+  <p style="color:var(--muted);font-size:12.5px">⚠ 注入失败时必须明确告知用户："[sim] CTS run_001 将被人为标记失败, recommendation=retry"，避免和真 PPA 混淆。</p>
+</section>
+
+</main>
+
+<footer>
+  生成自 <code>docs/workflow.md</code> · <code>skills/run-chip-flow/SKILL.md</code> · <code>core/workflow/state_manager.py</code> · 各 <code>agents/*/AGENT.md</code>
+</footer>
+
+<script>
+  // ---------- Tab switching ----------
+  const tabs = document.querySelectorAll('nav.tabs button');
+  const sections = document.querySelectorAll('main > section');
+  tabs.forEach(btn => btn.addEventListener('click', () => {
+    tabs.forEach(b => b.classList.remove('active'));
+    sections.forEach(s => s.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+    window.scrollTo({top:0,behavior:'smooth'});
+  }));
+
+  // ---------- FSM interactive details ----------
+  const fsmInfo = {
+    INIT: {
+      title: 'INIT · 等待人类输入',
+      desc: 'workspace 刚初始化完成。state/machine.yaml 已写入，但没有任何 Spec、没有任何 run。',
+      transitions: [['human_input','SPEC_DRAFTING','人类提供一句模糊目标']]
+    },
+    SPEC_DRAFTING: {
+      title: 'SPEC_DRAFTING · Spec Agent 写草稿',
+      desc: '编排器已唤醒 Spec Agent。Agent 正在读模板、读上游失败 eval（如果是 revision），写出 global + stages YAML 草稿。',
+      transitions: [['spec_ready','SPEC_REVIEW','Spec Agent 完成草稿落盘']]
+    },
+    SPEC_REVIEW: {
+      title: 'SPEC_REVIEW · 等人类审批 ⏸',
+      desc: '编排器停止调度，把 spec 内容呈现给用户。<b>必须经过这道关</b>才能进入执行阶段。',
+      transitions: [
+        ['human_approved','SCHEDULING','用户批准 → 写入 spec_version'],
+        ['human_rejected','SPEC_DRAFTING','用户要求改 → 带反馈再唤醒 Spec Agent']
+      ]
+    },
+    SCHEDULING: {
+      title: 'SCHEDULING · 编排器中枢',
+      desc: '系统的核心思考状态。编排器读 state + 最新 eval_result，决定下一步是 dispatch / retry / rollback / revise_spec / complete / abort。',
+      transitions: [
+        ['dispatch','STAGE_RUNNING','选定一个 Sub-agent 唤醒'],
+        ['revise_spec','SPEC_DRAFTING','判定 Spec 不可达'],
+        ['all_passed','COMPLETED','满足 termination_criteria'],
+        ['budget_exhausted','ABORTED','全局重试预算耗尽 / 不可恢复']
+      ]
+    },
+    STAGE_RUNNING: {
+      title: 'STAGE_RUNNING · Sub-agent 干活中',
+      desc: '某个 Sub-agent（Floorplan / CTS / Route / Timing ECO）正在执行。它自己跑完 → 自评估 → 落盘 _meta + eval_result + artifacts。',
+      transitions: [['agent_done','SCHEDULING','Sub-agent 落盘完成休眠，控制权回编排器']]
+    },
+    COMPLETED: {
+      title: 'COMPLETED · 终态 ✓',
+      desc: '所有阶段 eval pass，命中 termination_criteria。workspace 保留供交付与回看，不自动清理。',
+      transitions: []
+    },
+    ABORTED: {
+      title: 'ABORTED · 终态 ✗',
+      desc: '全局重试预算耗尽或遇到不可恢复错误。需要汇报失败原因 + 最后一次 eval + 建议的人工干预方向。',
+      transitions: []
+    }
+  };
+
+  const fsmGrid = document.getElementById('fsmGrid');
+  const fsmDetail = document.getElementById('fsmDetail');
+  fsmGrid.querySelectorAll('.node').forEach(node => {
+    node.addEventListener('click', () => {
+      fsmGrid.querySelectorAll('.node').forEach(n => n.classList.remove('active'));
+      node.classList.add('active');
+      const info = fsmInfo[node.dataset.state];
+      let html = '<h4>' + info.title + '</h4><p style="color:#cbd5e1;font-size:13.5px">' + info.desc + '</p>';
+      if (info.transitions.length === 0) {
+        html += '<p style="color:var(--muted);font-style:italic">这是终态，无出向转移。</p>';
+      } else {
+        html += '<table style="margin-top:6px"><thead><tr><th>事件</th><th>目标状态</th><th>触发条件</th></tr></thead><tbody>';
+        info.transitions.forEach(t => {
+          html += '<tr><td><code>' + t[0] + '</code></td><td><code>' + t[1] + '</code></td><td>' + t[2] + '</td></tr>';
+        });
+        html += '</tbody></table>';
+      }
+      fsmDetail.innerHTML = html;
+    });
+  });
+</script>
+
+</body>
+</html>

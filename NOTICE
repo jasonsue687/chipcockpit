@@ -1,0 +1,16 @@
+ChipCockpit / chip-backend-ai
+Copyright 2026 ChipCockpit contributors
+
+This product includes software developed for ChipCockpit
+(https://chipcockpit.org).
+
+Trademarks
+----------
+Cadence, Innovus, Tempus, Voltus, and related names are trademarks of
+Cadence Design Systems, Inc. Other third-party EDA product names that may
+appear in interoperability docs are trademarks of their respective owners.
+Mentions do not imply endorsement or redistribution of proprietary manuals
+or PDKs.
+
+This open-source tree does NOT ship vendor user manuals, PDKs, or
+licensed EDA binaries. Simulated / mock EDA paths are for demos only.

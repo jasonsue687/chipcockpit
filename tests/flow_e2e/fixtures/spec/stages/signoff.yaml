@@ -1,0 +1,53 @@
+# SIMULATED fixture — signoff stage spec for the e2e validation.
+# Derived from templates/stage_spec_template.yaml; modeled on route.yaml.
+#
+# Metric names are chosen to (a) exist in core/router.py METRIC_PATTERNS so the
+# parser extracts them (drc_violations → "total violations = <int>"; ALREADY in
+# METRIC_PATTERNS + mock_eda LINE_FORMATTERS, reused from import/route — NOT
+# touched here), and (b) be satisfiable by core/sim/mock_eda in-range picks
+# (max:0 → mock picks 0), so the signoff_eval gate PASSes in SIMULATION mode.
+#
+# Single-report gate: signoff_eval reads stages/signoff/reports/drc_lvs.rpt and
+# checks drc_violations only. The IR/EM limits below are template parameters for
+# signoff_ir_em (which writes ir_em.rpt for the human waiver review + records);
+# power_grid_ir_drop is intentionally NOT a gated metric here so the gate stays
+# single-report. (To gate it too, add it under metrics AND point signoff_eval at
+# ir_em.rpt as well — out of scope for the single-report design.)
+
+stage: "signoff"
+spec_version: "v1"
+
+description: "Signoff quality gate (DRC/LVS clean, IR/EM within limits) for the design (simulation)."
+
+metrics:
+  - name: drc_violations            # signoff DRC + LVS + antenna/ERC violation count (lower = better; 0 = clean)
+    target:
+      min: null
+      max: 0
+    description: "Total signoff DRC/LVS/antenna violations after metal fill; must be clean (0)."
+
+# parameters feed render-tcl (spec.parameters are merged under decisions.params,
+# so every {{placeholder}} in templates/tcl/signoff/*.tcl.tmpl resolves). Both
+# signoff_drc_lvs and signoff_ir_em are mechanical run-eda-script steps (no
+# decision skill). Path-like vars (report_dir/artifact_dir) come from the harness
+# via --var, not here.
+parameters:
+  # --- metal_fill (density fill) ---------------------------------------------
+  fill_metal_layers: "M1 M2 M3 M4 M5 M6 M7"  # layers to dummy/metal-fill
+  min_density: 0.30                 # setMetalFill -minDensity (per-layer floor)
+  max_density: 0.70                 # setMetalFill -maxDensity (per-layer ceiling)
+  # --- signoff_drc_lvs (physical verification) -------------------------------
+  drc_report_limit: 1000            # verify_drc -limit / verifyConnectivity -error
+  drc_rule_deck: "foundry_drc.rul"  # signoff DRC rule deck
+  lvs_rule_deck: "foundry_lvs.rul"  # signoff LVS rule deck
+  # --- signoff_ir_em (power-grid IR/EM analysis) -----------------------------
+  power_net: "VDD"                  # rail net for IR/EM analysis
+  ground_net: "VSS"                 # ground net for IR/EM analysis
+  ir_static_limit_mv: 50            # checkIRDrop -limit (static IR budget, mV)
+  ir_dynamic_limit_mv: 60           # checkIRDrop -limit (dynamic IR budget, mV)
+  em_check: "all"                   # reportEM -analysis (signal + power EM)
+
+upstream:
+  required_checkpoint: null
+  required_stages:
+    - timing_eco

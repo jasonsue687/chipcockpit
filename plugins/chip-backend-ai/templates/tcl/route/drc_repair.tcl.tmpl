@@ -1,0 +1,35 @@
+# ===========================================================================
+# drc_repair.tcl  —  golden template, rendered by render-tcl
+#   AI-decision step (route-drc-repair / route.drc_repair): diagnose then repair
+#   DRC + antenna violations (search & repair, redundant via insertion). This is
+#   an iterative diagnostic loop — verify, then targeted repair, then re-verify.
+#   Produces routed_clean.def AND drc.rpt (the route gate report).
+#   double-brace placeholders filled from stage spec + decisions(params) + --var;
+#   '### @inject:<block>' injects AI-authored fragments from decisions.fragments
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- baseline DRC verification (diagnose what needs repair) -----------------
+verify_drc -limit {{drc_report_limit}}
+
+# --- antenna fix (gate-oxide protection) + diode mode -----------------------
+setNanoRouteMode -drouteFixAntenna {{antenna_fix_mode}}
+setNanoRouteMode -routeAntennaCellName {{antenna_diode_cell}}
+
+# --- ECO search & repair of DRC/antenna violations --------------------------
+ecoRoute -fix_drc
+
+# --- redundant (double) via insertion for yield/EM --------------------------
+setNanoRouteMode -routeWithViaInPin {{via_in_pin}}
+addVias -double_via_max {{redundant_via_effort}}
+
+# --- AI-authored targeted repair commands (verified via search-eda-command) -
+# (e.g. editDelete on a shorted wire then ecoRoute -nets <net>; setNanoRouteMode
+#  -droutePostRouteSpreadWire true; deleteFiller before repair ...)
+### @inject:drc_repair_cmds
+
+# --- re-verify after repair + write the gate DRC report ---------------------
+verify_drc -limit {{drc_report_limit}} -report {{report_dir}}/drc.rpt
+
+# --- persist the DRC-clean routed design ------------------------------------
+defOut {{artifact_dir}}/routed_clean.def

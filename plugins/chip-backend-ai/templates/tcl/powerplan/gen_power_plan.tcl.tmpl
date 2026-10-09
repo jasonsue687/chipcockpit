@@ -1,0 +1,37 @@
+# ===========================================================================
+# gen_power_plan.tcl  —  golden template, rendered by render-tcl
+#   AI-decision step (powerplan-design): emit the power-grid build script —
+#   power ring + stripes + sroute strategy. This step PRODUCES a Tcl artifact
+#   (power_plan.tcl) that the downstream run_power_plan step sources.
+#   double-brace placeholders filled from stage spec + decisions(params) + --var;
+#   '### @inject:<block>' injects AI-authored fragments from decisions.fragments
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- nets the power grid carries -------------------------------------------
+set pg_nets { {{power_net}} {{ground_net}} }
+
+# --- core power ring around the core boundary ------------------------------
+addRing -nets $pg_nets \
+    -type core_rings -follow core \
+    -layer {top {{ring_layer}} bottom {{ring_layer}} left {{ring_layer_v}} right {{ring_layer_v}}} \
+    -width {{ring_width_um}} -spacing {{ring_spacing_um}} \
+    -offset {{ring_offset_um}}
+
+# --- top-level power stripes across the core -------------------------------
+addStripe -nets $pg_nets \
+    -layer {{stripe_layer}} \
+    -direction vertical \
+    -width {{stripe_width_um}} -spacing {{stripe_spacing_um}} \
+    -set_to_set_distance {{stripe_pitch_um}}
+
+# --- AI-authored extra rings / block rings / stripe tuning -----------------
+### @inject:extra_pg_cmds
+
+# --- connect stripes/rings to std-cell rails + macro pins ------------------
+sroute -nets $pg_nets -connect {{sroute_target}} \
+    -layerChangeRange { {{ring_layer_v}} {{stripe_layer}} }
+
+# --- persist the generated power-plan script as this step's artifact -------
+# (render-tcl produced THIS file; we re-emit a self-contained PG script.)
+saveTclScript {{artifact_dir}}/power_plan.tcl

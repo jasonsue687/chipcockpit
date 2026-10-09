@@ -1,0 +1,25 @@
+# ===========================================================================
+# streamout.tcl  —  golden template, rendered by render-tcl
+#   Mechanical step: stream the finished design out to GDSII and merge in the
+#   foundry / IP GDS, producing the final tapeout database. No decision layer —
+#   params come straight from the stage spec + the artifact paths.
+#   double-brace placeholders filled from stage spec + parameters + --var.
+#   Produces chip.gds (the final tapeout deliverable).
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- operate on the finished design ----------------------------------------
+#   (final.def from chip_finishing is the design being streamed out here)
+
+# --- stream out GDSII with the layer map -----------------------------------
+streamOut {{artifact_dir}}/chip.gds \
+    -mapFile {{gds_layer_map}} \
+    -libName {{gds_cell_name}} \
+    -units 1000 \
+    -mode ALL
+
+# --- merge in foundry / hard-IP GDS (if any) -------------------------------
+streamOut {{artifact_dir}}/chip.gds -merge { {{gds_cell_name}} }
+
+# --- final GDS verification record -----------------------------------------
+verifyGeometry -outfile {{report_dir}}/streamout.rpt

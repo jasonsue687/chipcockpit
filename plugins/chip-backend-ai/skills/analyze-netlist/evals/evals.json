@@ -1,0 +1,60 @@
+{
+  "skill_name": "analyze-netlist",
+  "evals": [
+    {
+      "id": 1,
+      "name": "gate-level-tiny-explicit-path",
+      "prompt": "分析一下这个网表 ${CLAUDE_PLUGIN_ROOT}/skills/analyze-netlist/evals/fixtures/tiny_gate.v，告诉我它的端口、层次、组合逻辑深度和时钟扇出。",
+      "expected_output": "Markdown report at <fixture_dir>/tiny_gate_analysis.md containing all seven sections; top inferred as `tiny_gate`; max logic depth = 3; 1 clock (clk) with fanout 2; 1 reset (rstn) with fanout 2; dout output port shows u_ff0.Q and u_ff1.Q as drivers.",
+      "files": ["fixtures/tiny_gate.v"],
+      "assertions": [
+        {"id": "report_exists", "text": "A Markdown report file is produced and contains a section titled '## 1. Summary'"},
+        {"id": "top_inferred", "text": "Top module is correctly inferred as `tiny_gate`"},
+        {"id": "format_gate_level", "text": "Detected format is reported as Gate-level Verilog"},
+        {"id": "logic_depth_value", "text": "Section 4 reports max combinational depth = 3 (and1 → xor → inv)"},
+        {"id": "clock_detected", "text": "Section 6 lists `clk` as a clock with fanout 2"},
+        {"id": "reset_detected", "text": "Section 6 lists `rstn` as a reset with fanout 2"},
+        {"id": "bus_output_resolved", "text": "Section 5 shows `dout` port driven by both `u_ff0.Q` and `u_ff1.Q` (bus aggregation worked)"},
+        {"id": "hierarchy_tree_correct", "text": "Section 3 shows `u_x (sub_xor)` as a non-leaf hierarchical instance containing `u_xor (XOR2D1)`"}
+      ]
+    },
+    {
+      "id": 2,
+      "name": "rtl-fallback-graceful-skip",
+      "prompt": "帮我看看 ${CLAUDE_PLUGIN_ROOT}/skills/analyze-netlist/evals/fixtures/tiny_rtl.v 这个文件的结构，端口都有哪些，时钟域怎样。",
+      "expected_output": "Markdown report; format detected as RTL Verilog; logic-depth section explicitly says 'Skipped (requires gate-level netlist)' — does NOT silently report depth=0; port table still correct (clk, rst_n, enable, count[3:0]); clock `clk` detected; user is told in the conversation reply that logic depth analysis was skipped and why.",
+      "files": ["fixtures/tiny_rtl.v"],
+      "assertions": [
+        {"id": "format_rtl", "text": "Detected format includes 'RTL' or 'behavioral'"},
+        {"id": "depth_skipped_message", "text": "Section 4 contains 'Skipped' and references gate-level netlist requirement"},
+        {"id": "port_table_correct", "text": "Section 2 lists exactly 4 ports: clk, rst_n, enable, count (4-bit)"},
+        {"id": "rst_n_recognized", "text": "`rst_n` is recognized as a reset signal in Section 6 (variant with underscore)"},
+        {"id": "user_informed_about_fallback", "text": "Claude's conversation reply tells the user the logic-depth analysis was skipped and points them at gate-level netlist or Innovus DB as remedies"}
+      ]
+    },
+    {
+      "id": 3,
+      "name": "missing-or-broken-netlist-path",
+      "prompt": "分析一下网表 /tmp/this/path/definitely/does/not/exist.v",
+      "expected_output": "Claude does NOT pretend to analyze the file. It surfaces that the path is missing, distinguishes between 'not a file' vs 'broken symlink' if applicable, and offers next steps (ask user for a real path, list candidates in datain/, etc). No Markdown report is produced.",
+      "files": [],
+      "assertions": [
+        {"id": "no_silent_success", "text": "Claude does not report success or produce a fake report"},
+        {"id": "error_explained", "text": "Claude clearly tells the user the netlist path does not exist"},
+        {"id": "next_step_offered", "text": "Claude proposes a concrete next step (e.g., ask user to provide correct path, or run `find` to locate netlists)"}
+      ]
+    },
+    {
+      "id": 4,
+      "name": "no-path-given-asks-for-input",
+      "prompt": "我想分析一下我的网表，告诉我端口和信号流。",
+      "expected_output": "Claude asks the user for the netlist path (and optionally the top module name) before proceeding. It does not invent a path or assume datain/.",
+      "files": [],
+      "assertions": [
+        {"id": "asks_for_path", "text": "Claude explicitly asks the user for the netlist file path before running anything"},
+        {"id": "no_invented_path", "text": "Claude does not invoke the analyzer script against an assumed path"},
+        {"id": "mentions_format_options", "text": "Claude indicates it can handle .v/.vg/.gv files and optionally Innovus DB"}
+      ]
+    }
+  ]
+}

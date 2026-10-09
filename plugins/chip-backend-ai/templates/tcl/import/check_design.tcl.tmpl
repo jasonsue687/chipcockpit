@@ -1,0 +1,16 @@
+# ===========================================================================
+# check_design.tcl  —  golden template, rendered by render-tcl
+#   Post-import integrity checks: netlist/PG/library completeness + timing.
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- design / netlist integrity --------------------------------------------
+check_design -type {{check_type}} -outfile {{report_dir}}/check_design.rpt
+
+# --- unconstrained / missing-constraint timing checks ----------------------
+check_timing -unconstrained >> {{report_dir}}/check_design.rpt
+
+### @inject:extra_checks
+
+# --- summarize import quality into the gate report -------------------------
+report_design >> {{report_dir}}/check_design.rpt

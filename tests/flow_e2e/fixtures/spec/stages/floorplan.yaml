@@ -1,0 +1,48 @@
+# SIMULATED fixture — floorplan stage spec for the e2e validation.
+# Derived from templates/stage_spec_template.yaml; modeled on import.yaml.
+#
+# Metric names are chosen to (a) exist in core/router.py METRIC_PATTERNS so the
+# parser extracts them, and (b) be satisfiable by core/sim/mock_eda in-range
+# picks, so the floorplan_eval gate PASSes in SIMULATION mode.
+
+stage: "floorplan"
+spec_version: "v1"
+
+description: "Floorplan quality gate (utilization / macro channel) for the design (simulation)."
+
+metrics:
+  - name: utilization             # core density after floorplan init
+    target:
+      min: 0.60
+      max: 0.80
+    description: "Reported core utilization after floorplan; within target band."
+  - name: macro_channel_width_um  # routing channel between/around macros
+    target:
+      min: 2.0
+      max: null
+    description: "Narrowest macro-to-macro channel; must clear the routing minimum."
+
+# parameters feed both the decision scripts (gen_decisions.py reads targets +
+# these) and render-tcl (spec.parameters are merged under decisions.params, so
+# every {{placeholder}} in templates/tcl/floorplan/*.tcl.tmpl resolves).
+parameters:
+  # --- gen_floorplan ---
+  target_utilization: 0.70        # AI baseline; gen_decisions may refine from metric band
+  aspect_ratio: 1.0
+  core_to_io_margin_um: 5.0
+  # --- place_io_pins ---
+  pin_layer_h: "M3"
+  pin_layer_v: "M4"
+  pin_spacing_um: 0.5
+  pin_side: "Left"
+  # --- macro_placement ---
+  macro_channel_width_um: 4.0     # AI baseline channel target; >= metric min 2.0
+  macro_orientation: "R0"
+  # --- add_blockage ---
+  halo_um: 3.0
+  blockage_type: "soft"
+
+upstream:
+  required_checkpoint: null
+  required_stages:
+    - import

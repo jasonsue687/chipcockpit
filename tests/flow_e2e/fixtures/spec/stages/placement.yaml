@@ -1,0 +1,39 @@
+# SIMULATED fixture — placement stage spec for the e2e validation.
+# Derived from templates/stage_spec_template.yaml; modeled on powerplan.yaml.
+#
+# Metric names are chosen to (a) exist in core/router.py METRIC_PATTERNS so the
+# parser extracts them (congestion_hotspot → "total overflow = <v>"), and
+# (b) be satisfiable by core/sim/mock_eda in-range picks, so the placement_eval
+# gate PASSes in SIMULATION mode.
+
+stage: "placement"
+spec_version: "v1"
+
+description: "Placement quality gate (congestion / pre-CTS timing) for the design (simulation)."
+
+metrics:
+  - name: congestion_hotspot       # worst trial-route overflow (lower = less congested)
+    target:
+      min: null
+      max: 0.8
+    description: "Worst-case routing overflow after trial route; must stay under budget."
+
+# parameters feed both the decision script (gen_decisions.py reads the congestion
+# target + these) and render-tcl (spec.parameters are merged under decisions.params,
+# so every {{placeholder}} in templates/tcl/placement/*.tcl.tmpl resolves). Path-like
+# vars (report_dir/artifact_dir) come from the harness via --var, not here.
+parameters:
+  # --- place_opt (placement strategy; AI baseline, gen_decisions may refine) -
+  target_utilization_margin: 0.05   # global-place utilization headroom (0..1)
+  congestion_effort: "medium"       # -place_global_cong_effort low|medium|high
+  place_global_timing_effort: "medium"  # -place_global_timing_effort
+  hfns_threshold_fanout: 32         # HFNS trigger fanout (-place_global_max_fanout)
+  tie_cell: "TIELO"                 # tie-low/high cell for constant pins
+  # --- scan_reorder ----------------------------------------------------------
+  scan_keep_clock_grouping: "true"  # keep scan flops grouped by clock
+  scan_reorder_effort: "high"
+
+upstream:
+  required_checkpoint: null
+  required_stages:
+    - powerplan

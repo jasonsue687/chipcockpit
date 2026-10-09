@@ -1,0 +1,72 @@
+# SIMULATED fixture — timing_eco stage spec for the e2e validation.
+# Derived from templates/stage_spec_template.yaml; modeled on cts.yaml.
+#
+# Metric names are chosen to (a) exist in core/router.py METRIC_PATTERNS so the
+# parser extracts them (wns_ns → "WNS (ns) = <v>", tns_ns → "TNS (ns) = <v>",
+# hold_wns_ns → "hold WNS (ns) = <v>"; ALL THREE already in METRIC_PATTERNS +
+# mock_eda LINE_FORMATTERS, reused as-is), and (b) be satisfiable by
+# core/sim/mock_eda in-range picks, so the timing_eval gate PASSes in SIMULATION
+# mode.
+#
+# SLACK-FLOOR semantics: timing slack metrics use {min: <floor>, max: null} —
+# pass means actual >= min. mock_eda.pick_actual returns min + 10% for a
+# min-only target (e.g. wns floor -0.1 → -0.09, which is >= -0.1 → pass; hold
+# floor 0.0 → 0.1 >= 0.0 → pass). Do NOT use max:0 here.
+
+stage: "timing_eco"
+spec_version: "v1"
+
+description: "Timing-closure / ECO quality gate (WNS / TNS / hold across all views) for the design (simulation)."
+
+metrics:
+  - name: wns_ns                   # worst negative slack (setup; ns; higher = better; >= floor = pass)
+    target:
+      min: -0.1
+      max: null
+    description: "Post-ECO worst setup slack across all corners/modes; must stay above the floor (small residual tolerated)."
+  - name: tns_ns                   # total negative slack (setup; ns; higher = better; >= floor = pass)
+    target:
+      min: -1.0
+      max: null
+    description: "Post-ECO total negative setup slack across all corners/modes; must stay above the floor."
+  - name: hold_wns_ns              # worst hold slack (ns; higher = better; >= floor = pass)
+    target:
+      min: 0.0
+      max: null
+    description: "Post-ECO worst hold slack across all corners/modes; must be non-negative (hold clean)."
+
+# parameters feed both the decision script (timing-eco-design gen_decisions reads
+# the WNS/TNS/hold floors + these) and render-tcl (spec.parameters are merged
+# under decisions.params, so every {{placeholder}} in
+# templates/tcl/timing_eco/*.tcl.tmpl resolves). Path-like vars
+# (report_dir/artifact_dir) come from the harness via --var, not here.
+parameters:
+  # --- fix_strategy (timing ECO strategy; AI baseline, gen_decisions may refine)
+  setup_fix_effort: "high"          # optDesign -postRoute -setup -effort
+  hold_fix_effort: "high"           # optDesign -postRoute -hold -effort
+  max_buffer_count: 5000            # setEcoMode -maxBufferCount (ECO scale ceiling)
+  useful_skew_enable: "true"        # set_ccopt_property useful_skew (borrow time across paths)
+  setup_buffer_cell: "BUFX4"        # setup repair repeater / buffer leaf cell
+  hold_buffer_cell: "DLYX1"         # hold repair delay / hold buffer cell
+  resize_enable: "true"             # setOptMode -optimizeFootprint (gate resize / Vt-swap)
+  allow_setup_degrade: "true"       # setOptMode -fixHoldAllowSetupTnsDegrade
+  hold_target_slack_ns: 0.05        # hold repair target slack (leave OCV/SI margin)
+  setup_target_slack_ns: 0.0        # setup repair target slack
+  fix_drv: "true"                   # setOptMode -fixFanoutLoad (sweep DRV alongside)
+  # --- extract_rc (mechanical RC extraction) ---------------------------------
+  rc_engine: "postRoute"            # setExtractRCMode -engine
+  rc_effort: "high"                 # setExtractRCMode -effortLevel
+  rc_coupled: "true"                # setExtractRCMode -coupled (coupling caps for SI)
+  # --- signoff_sta (mechanical signoff timing) -------------------------------
+  sta_analysis_type: "onChipVariation"  # setAnalysisMode -analysisType (OCV)
+  sta_check_type: "setup"           # setAnalysisMode -checkType
+  si_analysis: "true"               # setSIMode -analysisType (signal integrity)
+  report_max_paths: 1000            # report_timing -max_paths
+  # --- apply_eco (mechanical ECO apply + re-time) ----------------------------
+  eco_fix_groute: "true"            # ecoPlace -fixGlobalRoute
+  eco_route_mode: "drc"             # ecoRoute -target (drc | timing)
+
+upstream:
+  required_checkpoint: null
+  required_stages:
+    - route

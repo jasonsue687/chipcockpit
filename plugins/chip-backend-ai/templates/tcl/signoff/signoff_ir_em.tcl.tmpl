@@ -1,0 +1,30 @@
+# ===========================================================================
+# signoff_ir_em.tcl  —  golden template, rendered by render-tcl
+#   Mechanical step: signoff power-grid analysis on the filled design — static
+#   AND dynamic (vectorless) IR-drop plus electromigration — then emit a
+#   parseable IR/EM report. No decision layer — params come from the stage spec.
+#   double-brace placeholders filled from stage spec + parameters + --var.
+#   Produces ir_em.rpt (worst IR drop line; the signoff_eval gate reads
+#   drc_lvs.rpt, but this report stays for the waiver review + records).
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- operate on the metal-filled design ------------------------------------
+#   (filled.def from metal_fill is the design under analysis here)
+
+# --- static IR-drop on the power grid --------------------------------------
+setPowerAnalysisMode -method static
+analyzePower -nets { {{power_net}} {{ground_net}} } -rail_analysis_mode static
+checkIRDrop -limit {{ir_static_limit_mv}}
+
+# --- dynamic (vectorless) IR-drop ------------------------------------------
+setPowerAnalysisMode -method dynamic
+analyzePower -nets { {{power_net}} {{ground_net}} } -rail_analysis_mode dynamic
+checkIRDrop -limit {{ir_dynamic_limit_mv}}
+
+# --- electromigration on the rails (signal + power) ------------------------
+reportEM -nets { {{power_net}} {{ground_net}} } -analysis {{em_check}}
+
+# --- summarize worst IR drop + EM into the IR/EM report --------------------
+report_ir -outfile {{report_dir}}/ir_em.rpt
+reportEM -nets { {{power_net}} {{ground_net}} } >> {{report_dir}}/ir_em.rpt

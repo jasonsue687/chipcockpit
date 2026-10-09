@@ -1,0 +1,25 @@
+# Stage Spec Template — 阶段级约束规范
+# 每个阶段一份，存放于 spec/stages/<stage>.yaml
+
+stage: ""                              # 阶段名（floorplan / cts / route）
+spec_version: "v1"                     # 与 global_spec 版本同步
+
+# 阶段描述
+description: ""
+
+# 阶段指标约束
+# 每项指标必须包含 name + target，自动校验（parse-eda-report）评估时填入 actual 和 status
+metrics:
+  - name: ""                           # 指标名（如 utilization, congestion_hotspot）
+    target:
+      min: null                        # 最小阈值（null 表示不约束）
+      max: null                        # 最大阈值
+    description: ""                    # 指标含义说明
+
+# 阶段特定参数（AI 决策 skill / 主 agent 可参考的指导参数）
+parameters: {}
+
+# 上游依赖
+upstream:
+  required_checkpoint: null            # 需要的上游 checkpoint（如 "post_floorplan"）
+  required_stages: []                  # 必须先通过的阶段列表

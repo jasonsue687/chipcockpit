@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Floorplan AI Agent 设计参考 · 流程梳理与 AI 辅助评分</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #161c24;
+    --panel-2: #1d242d;
+    --border: #2a323d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --accent-2: #79c0ff;
+    --good: #3fb950;
+    --mid: #d29922;
+    --warn: #f85149;
+    --pill-bg: #21262d;
+    --shadow: 0 6px 20px rgba(0,0,0,0.35);
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Microsoft YaHei", Helvetica, Arial, sans-serif;
+    font-size: 15px; line-height: 1.55;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  header {
+    padding: 36px 28px 20px;
+    background: linear-gradient(180deg, #11171f 0%, #0f1419 100%);
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 {
+    margin: 0 0 6px; font-size: 26px; letter-spacing: 0.5px;
+  }
+  header p { margin: 4px 0; color: var(--muted); }
+  .container {
+    max-width: 1180px; margin: 0 auto; padding: 24px 24px 60px;
+  }
+  /* === Summary bar === */
+  .summary {
+    display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px;
+    margin: 18px 0 24px;
+  }
+  .stat {
+    background: var(--panel); border: 1px solid var(--border);
+    padding: 14px 16px; border-radius: var(--radius);
+  }
+  .stat .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.8px; }
+  .stat .value { font-size: 22px; font-weight: 600; margin-top: 4px; }
+  .stat .value .unit { font-size: 13px; color: var(--muted); margin-left: 4px; }
+
+  /* === Filter bar === */
+  .filter-bar {
+    display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+    margin: 0 0 18px;
+  }
+  .filter-bar .label { color: var(--muted); font-size: 13px; }
+  .chip {
+    background: var(--pill-bg); color: var(--text);
+    border: 1px solid var(--border); padding: 6px 12px;
+    border-radius: 999px; font-size: 13px; cursor: pointer;
+    user-select: none; transition: all .15s ease;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--accent-2); }
+  .chip.active { background: var(--accent); color: #0d1117; border-color: var(--accent); font-weight: 600; }
+  .chip .count { color: var(--muted); margin-left: 4px; font-size: 12px; }
+  .chip.active .count { color: #0d1117; }
+
+  /* === Timeline strip === */
+  .timeline {
+    display: grid; grid-template-columns: repeat(11, 1fr);
+    gap: 4px; margin: 8px 0 26px;
+  }
+  .tl-cell {
+    background: var(--panel); border: 1px solid var(--border);
+    padding: 8px 6px; border-radius: 6px;
+    text-align: center; cursor: pointer;
+    transition: transform .12s ease, border-color .12s ease;
+    font-size: 12px;
+  }
+  .tl-cell:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .tl-cell .num { display: block; font-size: 11px; color: var(--muted); }
+  .tl-cell .score {
+    display: inline-block; width: 22px; height: 22px; line-height: 22px;
+    border-radius: 50%; font-weight: 700; font-size: 12px; margin-top: 4px;
+  }
+
+  /* === Cards === */
+  .step {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); margin-bottom: 14px; overflow: hidden;
+    transition: border-color .15s ease;
+  }
+  .step.hidden { display: none; }
+  .step-head {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 18px; cursor: pointer;
+    background: linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%);
+  }
+  .step-head:hover { background: rgba(88,166,255,0.05); }
+  .step-num {
+    flex-shrink: 0; width: 30px; height: 30px; border-radius: 6px;
+    background: var(--pill-bg); color: var(--muted);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 13px;
+  }
+  .step-title {
+    flex: 1; min-width: 0;
+  }
+  .step-title .zh { font-size: 16px; font-weight: 600; }
+  .step-title .en { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .score-badge {
+    flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 10px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  }
+  .score-badge .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .score-good { background: rgba(63,185,80,0.12); color: var(--good); }
+  .score-good .dot { background: var(--good); }
+  .score-mid { background: rgba(210,153,34,0.12); color: var(--mid); }
+  .score-mid .dot { background: var(--mid); }
+  .score-low { background: rgba(248,81,73,0.12); color: var(--warn); }
+  .score-low .dot { background: var(--warn); }
+  .chev {
+    width: 18px; height: 18px; color: var(--muted);
+    transition: transform .2s ease;
+  }
+  .step.open .chev { transform: rotate(90deg); }
+  .step-body {
+    display: none; padding: 4px 18px 20px;
+    border-top: 1px solid var(--border);
+  }
+  .step.open .step-body { display: block; }
+
+  .grid-2 {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+    margin-top: 14px;
+  }
+  @media (max-width: 760px) {
+    .summary { grid-template-columns: repeat(2, 1fr); }
+    .grid-2 { grid-template-columns: 1fr; }
+    .timeline { grid-template-columns: repeat(6, 1fr); }
+  }
+  .block {
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 14px;
+  }
+  .block h4 {
+    margin: 0 0 8px; font-size: 12px;
+    color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .block ul { margin: 0; padding-left: 18px; }
+  .block li { margin: 3px 0; }
+  code {
+    background: rgba(110,118,129,0.18); color: var(--accent-2);
+    padding: 1px 6px; border-radius: 4px; font-size: 12.5px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .why {
+    background: var(--panel-2); border-left: 3px solid var(--accent);
+    padding: 12px 14px; border-radius: 0 8px 8px 0; margin-top: 14px;
+  }
+  .why h4 { margin: 0 0 6px; color: var(--accent-2); font-size: 13px; }
+  .why p { margin: 4px 0; }
+
+  .pros-cons {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px;
+  }
+  @media (max-width: 760px) { .pros-cons { grid-template-columns: 1fr; } }
+  .pros, .cons {
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 14px;
+  }
+  .pros h4 { color: var(--good); margin: 0 0 6px; font-size: 13px; }
+  .cons h4 { color: var(--warn); margin: 0 0 6px; font-size: 13px; }
+  .pros ul, .cons ul { margin: 0; padding-left: 18px; }
+
+  .hil-tag {
+    display: inline-block; background: rgba(88,166,255,0.12);
+    color: var(--accent-2); border: 1px solid rgba(88,166,255,0.25);
+    padding: 2px 8px; border-radius: 4px; font-size: 11px;
+    margin: 2px 4px 2px 0;
+  }
+
+  /* === Design implications === */
+  .implications {
+    margin-top: 36px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 22px 24px;
+  }
+  .implications h2 { margin-top: 0; }
+  .implications h3 { color: var(--accent-2); margin-top: 18px; margin-bottom: 6px; font-size: 15px; }
+  .quote {
+    border-left: 3px solid var(--mid); padding: 4px 12px;
+    color: var(--muted); font-style: italic; margin: 8px 0;
+  }
+
+  /* === Score legend === */
+  .legend { display: flex; gap: 12px; font-size: 12px; color: var(--muted); align-items: center; flex-wrap: wrap; }
+  .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  .toggle-all {
+    background: var(--pill-bg); color: var(--text); border: 1px solid var(--border);
+    padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px;
+    margin-left: auto;
+  }
+  .toggle-all:hover { border-color: var(--accent); }
+
+  /* === Upgrade paths === */
+  .upgrades {
+    background: linear-gradient(135deg, rgba(88,166,255,0.06), rgba(63,185,80,0.04));
+    border: 1px solid rgba(88,166,255,0.28);
+    border-radius: 8px; padding: 12px 14px; margin-top: 14px;
+  }
+  .upgrades h4 {
+    margin: 0 0 10px; color: var(--accent-2); font-size: 13px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .upgrades > p { margin: 4px 0; font-size: 13px; }
+  .plan-list { display: flex; flex-direction: column; gap: 10px; }
+  .plan {
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 10px 12px;
+    border-left: 3px solid var(--good);
+  }
+  .plan-name {
+    font-weight: 600; font-size: 13.5px; color: var(--accent-2);
+    margin-bottom: 4px;
+  }
+  .plan-desc { font-size: 13px; color: var(--text); }
+  .plan-note {
+    margin: 10px 0 0; font-size: 12.5px; color: var(--text);
+    background: rgba(210,153,34,0.10); padding: 8px 12px; border-radius: 6px;
+    border-left: 3px solid var(--mid);
+  }
+  .upgrade-brief {
+    color: var(--text); font-size: 13px;
+    background: var(--panel-2); padding: 8px 12px; border-radius: 6px;
+    border-left: 3px solid var(--accent);
+  }
+
+  /* === Common-pattern table === */
+  .pattern-table {
+    width: 100%; border-collapse: collapse;
+    margin: 10px 0 8px; font-size: 13px;
+  }
+  .pattern-table th, .pattern-table td {
+    border: 1px solid var(--border); padding: 9px 12px;
+    text-align: left; vertical-align: top;
+  }
+  .pattern-table th {
+    background: var(--panel-2); color: var(--muted);
+    font-weight: 600; font-size: 12px; letter-spacing: 0.4px;
+    text-transform: uppercase;
+  }
+  .pattern-table tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
+  .pattern-table .dim { color: var(--muted); font-size: 11.5px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="container" style="padding-top:0;padding-bottom:0;">
+    <h1>Floorplan AI Agent · 流程梳理与 AI 辅助评分</h1>
+    <p>面向人在回环 (Human-in-the-Loop) 的辅助驾驶型 floorplan agent 设计参考。</p>
+    <p style="font-size:13px">所有流程基于通用 PD 知识，不依赖任何项目文件 · 评分越高表示 AI 越能"自动 + 高质量"承担</p>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- ============ Summary bar ============ -->
+  <div class="summary">
+    <div class="stat">
+      <div class="label">总步骤数</div>
+      <div class="value">11<span class="unit">个核心步骤</span></div>
+    </div>
+    <div class="stat">
+      <div class="label">平均 AI 辅助评分</div>
+      <div class="value" id="avgScore">—<span class="unit">/ 10</span></div>
+    </div>
+    <div class="stat">
+      <div class="label">高分(8+) 步骤数</div>
+      <div class="value" id="goodCount">—<span class="unit">个 · AI 可主导</span></div>
+    </div>
+    <div class="stat">
+      <div class="label">低分(≤5) 步骤数</div>
+      <div class="value" id="lowCount">—<span class="unit">个 · 需人主导</span></div>
+    </div>
+  </div>
+
+  <!-- ============ Filter + Legend ============ -->
+  <div class="filter-bar">
+    <span class="label">筛选评分:</span>
+    <button class="chip active" data-filter="all">全部 <span class="count" id="cnt-all"></span></button>
+    <button class="chip" data-filter="good">高分 8–10 <span class="count" id="cnt-good"></span></button>
+    <button class="chip" data-filter="mid">中等 6–7 <span class="count" id="cnt-mid"></span></button>
+    <button class="chip" data-filter="low">低分 ≤5 <span class="count" id="cnt-low"></span></button>
+    <button class="toggle-all" id="toggleAll">全部展开</button>
+  </div>
+
+  <div class="filter-bar" style="margin-top:-8px;">
+    <div class="legend">
+      <span class="legend-item"><span class="legend-dot" style="background:var(--good)"></span>AI 可主导，人审核</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--mid)"></span>AI 提建议，人决策</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--warn)"></span>人主导，AI 打辅助</span>
+    </div>
+  </div>
+
+  <!-- ============ Timeline strip ============ -->
+  <div class="timeline" id="timeline"></div>
+
+  <!-- ============ Step cards (rendered by JS) ============ -->
+  <div id="steps"></div>
+
+  <!-- ============ Design Implications ============ -->
+  <div class="implications">
+    <h2>Agent 设计建议 · 从评分到架构</h2>
+
+    <h3>0. 低分步骤的共性药方</h3>
+    <p>从 Step 2 / 3 / 5 / 10 这几个评分较低步骤的解法回看，根因和解法可以归纳成 4 条通用模式：</p>
+    <table class="pattern-table">
+      <thead>
+        <tr>
+          <th>低分根因</th>
+          <th>共性解法</th>
+          <th>典型应用</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>AI 看不到的隐性约束<br><span class="dim">(package / 工艺经验 / 上代芯片)</span></td>
+          <td>显式化成 YAML 握手文件，把隐性变显性</td>
+          <td>Step 2 约束前置 · Step 3 协同握手文件 · Step 4 PG 模板</td>
+        </tr>
+        <tr>
+          <td>决策不可逆 / 拍板代价大</td>
+          <td>多候选 + 数据对比，让人在数据上选而非直觉上选</td>
+          <td>Step 2 多档探针 · Step 5 多候选 + Pareto</td>
+        </tr>
+        <tr>
+          <td>容易陷入局部最优 / 主观偏见 / Anchoring</td>
+          <td>AI 当质检员 / 评审员，而非决策者</td>
+          <td>Step 3 Lint · Step 5 Critique-Only · Step 10 A/B 归因 · Step 10 逃逸提案</td>
+        </tr>
+        <tr>
+          <td>项目特定 know-how 会随人员流动丢失</td>
+          <td>沉淀成可检索的语料 / 规则 / 模式库</td>
+          <td>Step 5 案例模式库 · Step 10 启发式库 · Step 7 hierarchy 命名规则</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="quote">通用心法：碰到任何 AI 评分低的步骤，先问"是哪一条根因？"，再套对应解法。<b>不要在 AI 不擅长的维度上硬刚，找到它真正擅长的角色。</b></div>
+
+    <h3>1. 用评分划分"自治度"分层</h3>
+    <ul>
+      <li><b>评分 8–10 的步骤</b> → Agent 可<i>主动生成 TCL 脚本 → 执行 → 给出 summary</i>，人只做事后审核 / 一次性参数确认。</li>
+      <li><b>评分 6–7 的步骤</b> → Agent 应"先生成多个候选方案 + 风险对比"，让用户在 UI 中选择，再落 TCL。</li>
+      <li><b>评分 ≤5 的步骤（尤其 macro placement、IO 排列）</b> → Agent 角色变成<i>信息提供者</i>：fanin/fanout 矩阵、flyline 图、congestion 预估，由人 drag-and-drop，Agent 只负责"语义化记录决策原因"。</li>
+    </ul>
+
+    <h3>2. 人在回环的"检查点"要明确</h3>
+    <p>根据上面的评分，<b>4 个强制人工检查点</b>是少不了的：</p>
+    <ul>
+      <li>✅ <b>Spec 确认</b>（开始前）：工艺角、面积目标、power budget</li>
+      <li>✅ <b>Die / Core 尺寸拍板</b>（Step 2 后）</li>
+      <li>✅ <b>Macro Placement Review</b>（Step 5 后，可能多轮）</li>
+      <li>✅ <b>Sign-off QoR Review</b>（Step 9–10 后，决定是否进 placement）</li>
+    </ul>
+    <p>其他步骤可走"<i>默认执行 + 异常打断</i>"模式（PreToolUse hook 拦危险命令即可）。</p>
+
+    <h3>3. Agent 的工具链应该长这样</h3>
+    <ul>
+      <li><b>读：</b>LEF/Lib/SDC/Netlist 解析 · 报告解析（congestion / IR / timing）· 项目目录 grep</li>
+      <li><b>写：</b>TCL 脚本生成 · 决策日志 (jsonl) · YAML spec 落盘</li>
+      <li><b>执行：</b>Innovus（建议无头模式 + log 流式回看，避免一把跑完丢上下文）</li>
+      <li><b>不要做：</b>静默修改 floorplan.def · 自动 git push · 删除 run 目录</li>
+    </ul>
+
+    <h3>4. 文件系统握手 (Filesystem Handoff) 比聊天可靠</h3>
+    <div class="quote">Macro 放置、PG 模板、halo 规则这些"工程师手感"，写成 YAML / DEF 落盘后，下一次 session 进来 Agent 仍能 100% 复现。聊天里的"上次咱们把 SRAM 放左下角"是会丢的。</div>
+
+    <h3>5. 一个值得借鉴的失败模式 (Anti-pattern)</h3>
+    <p>不要让 Agent 在 macro placement 步骤"独立想出一个 placement 然后让用户改"——
+      心理学上这叫 <i>anchoring</i>，用户会下意识在 AI 的 placement 上小修小补，错过本来更优的全局解。
+      正确做法：先给 <b>connectivity heatmap + dataflow 推荐方向</b>，让用户先画第一稿，Agent 再做 critique。</p>
+
+    <h3>6. 评分会随项目变化</h3>
+    <p>评分是<b>对"通用 floorplan 流程"</b>的判断。对特定项目，如果已经有成熟的 PG 模板 / 上代芯片的 floorplan 可参考，
+      很多 5–7 分的步骤会跃升到 8+；反之，全新工艺 / 新架构第一次 tape-out 时，原本 7 分的 PG planning 也可能跌到 5。
+      建议 Agent 维护一个 <code>project_maturity.yaml</code>，动态调整自治度。</p>
+  </div>
+
+  <p style="text-align:center; color:var(--muted); margin-top:36px; font-size:12px">
+    Generated for floorplan-agent design ideation · 可在浏览器中直接打开
+  </p>
+</div>
+
+<script>
+const STEPS = [
+  {
+    id: 1,
+    zh: "设计导入 & 库设置",
+    en: "Design Import & Library Setup",
+    score: 9,
+    desc: "加载综合后的网表 (.v)、SDC 时序约束、LEF（物理库）、.lib/.db（时序库）、QRC/TLU+ 寄生提取技术文件，以及 MMMC corner 定义（PVT 角 × mode）。这是整个 PD 流程的入口，任何一项错配后果都会传到后段。",
+    cmds: ["read_mmmc", "read_physical -lef", "read_netlist", "init_design", "set_interactive_constraint_modes"],
+    inputs: ["综合 netlist", "SDC", "LEF / Lib / QRC", "MMMC view 文件"],
+    outputs: ["内存中的 design DB", "library/timing 完整性 log"],
+    pros: [
+      "高度模板化，每个项目结构几乎相同",
+      "错误信息明确（缺 cell / 缺 view），AI 极擅长 trace",
+      "无创造性决策——只要照配置加载"
+    ],
+    cons: [
+      "MMMC corner 选错是隐性 bug，AI 无法判断'选哪些 corner 才合规'，需 STA 工程师确认"
+    ],
+    hil: ["首次确认 corner 列表"],
+    why: "AI 在这一步是高质量执行者：生成 read 脚本、解析 lib 缺失、对照 MMMC 表自检。唯一不可外包的是 corner 选择的合规性判断。"
+  },
+  {
+    id: 2,
+    zh: "Die / Core / Row 初始 Floorplan",
+    en: "Initial Floorplan: Die Size, Core, Row Creation",
+    score: 6,
+    desc: "决定 die 尺寸、core utilization、aspect ratio、core-to-IO 间距，创建 std cell row。这是 floorplan 中最有'蝴蝶效应'的一步——die 大小直接影响 cost、yield、package。",
+    cmds: ["floorPlan -site <site> -r <ratio> <util> <l> <r> <b> <t>", "setDesignMode"],
+    inputs: ["面积估算 (gate count × cell area)", "package 约束", "目标利用率 (通常 60–75%)"],
+    outputs: ["初始 floorplan DEF", "core/die box"],
+    pros: [
+      "AI 可基于 cell area 总和 + 目标 util 反推 die 尺寸候选",
+      "可一次性给出多套 (util, aspect) 候选 + 风险标注"
+    ],
+    cons: [
+      "die 尺寸常受 package / pad ring / 上代芯片约束，AI 不知道",
+      "利用率太高会导致 routing congestion，AI 缺乏'本工艺/本库的经验阈值'",
+      "一旦定下来很难改，错了要整段重来"
+    ],
+    hil: ["die 尺寸最终拍板", "目标 utilization 确认"],
+    why: "AI 能算数、能给候选，但'拍板'本质上是商业 + 工艺经验决策。建议 Agent 给出 3 个候选方案 + 各自风险，让人选。"
+  },
+  {
+    id: 3,
+    zh: "IO / Pin 放置",
+    en: "IO Pad Ring or Boundary Pin Placement",
+    score: 5,
+    desc: "对 pad-limited 芯片：放置 IO pad 环。对 block / SoC：放置 boundary pin。需考虑 pin 顺序、package routing、bump 对应关系、ESD 单元位置。",
+    cmds: ["editPin", "assignIoPins -pin <file>", "addIoFiller", "loadIoFile"],
+    inputs: ["IO 列表 / 引脚定义文件", "package ball map (顶层)", "ESD/clamp 单元清单"],
+    outputs: ["IO ring DEF", "pin location 报告"],
+    pros: [
+      "block 级：AI 可按 fanin/fanout cluster 自动分配 pin 到四边",
+      "可批量生成 pin 配置脚本"
+    ],
+    cons: [
+      "顶层 IO 放置和 package routing 强耦合，AI 看不到 package 设计",
+      "ESD/clamp/电源 IO 间距规则项目专属，常被忽略",
+      "改一次 IO 影响整条 wire-bond 设计"
+    ],
+    hil: ["顶层 IO 排列由 PD + 封装协同决定", "ESD 间距规则确认"],
+    why: "block 级 AI 能干，顶层不行。建议 Agent 区分'block IO 推荐'（默认开）和'顶层 pad ring'（只读取既定 IO file）两种模式。"
+  },
+  {
+    id: 4,
+    zh: "电源规划 (Power Planning)",
+    en: "Power Grid (Rings, Stripes, Mesh)",
+    score: 7,
+    desc: "构建 VDD/VSS 环、core stripe、follow pin、special net 连接。决定 stripe 宽度、间距、层次（通常 M5/M6 + 顶层粗金属）。",
+    cmds: ["addRing", "addStripe -nets {VDD VSS}", "sroute -connect {corePin}", "setAddStripeMode"],
+    inputs: ["power budget", "工艺 EM/IR 规则", "项目 PG 模板（如有）"],
+    outputs: ["PG DEF", "初步 IR drop 估算"],
+    pros: [
+      "高度模板化——大部分公司有 PG 标准模板",
+      "AI 可根据电流密度推算 stripe 间距",
+      "verify_power_via / report_power -rail 报告易解析"
+    ],
+    cons: [
+      "全新工艺 / 第一次流片时，模板还在搭建，AI 没参考",
+      "IR drop 收敛是迭代过程，需要 power 工程师 sign-off",
+      "PG 决策影响整个 routing 资源（占 M5/M6 多少）"
+    ],
+    hil: ["选择 / 确认 PG 模板", "首次 IR drop 评审"],
+    why: "有模板时 AI 几乎能全包；首次搭模板时 AI 只能给候选。建议 Agent 把 PG 模板沉淀为版本化 YAML，project_maturity 高时自动应用。"
+  },
+  {
+    id: 5,
+    zh: "宏单元放置 (Macro Placement)",
+    en: "Hard Macro Placement (SRAM/ROM/IP)",
+    score: 4,
+    desc: "把所有硬宏（SRAM、ROM、PHY、IP）放在合理位置：沿边、靠近相关逻辑、留够 routing channel、考虑 thermal 和 power、port 朝向 logic 侧。Floorplan 中最'手艺活'的一步。",
+    cmds: ["place_macro", "setObjFPlanBox", "place_design -concurrent_macros", "setPlaceMode -placeMacro"],
+    inputs: ["macro 列表 + 端口", "connectivity 矩阵", "dataflow 信息（来自 spec / 架构师）"],
+    outputs: ["macro 放置 DEF", "flyline 图"],
+    pros: [
+      "AI 可生成 connectivity heatmap + fanin/fanout 列表，节省人工分析时间",
+      "AI 能跑自动 macro placer 给第一版",
+      "AI 可批量验证 channel spacing 等规则"
+    ],
+    cons: [
+      "自动 placement 结果在复杂设计中几乎都需要人工大改",
+      "Anchoring 效应——人会被 AI 的初稿带偏",
+      "需要架构 + 时序 + congestion + thermal 综合直觉，AI 拿不到全部信号",
+      "和 IO/PG 互相耦合，单步优化不收敛"
+    ],
+    hil: ["几乎全程人监督，多轮迭代"],
+    why: "这是 AI 最不擅长的一步。最佳模式：AI 当'信息提供者 + critique 评审员'，由人主导拖动；Agent 负责事后把决策原因记到 decisions.jsonl。"
+  },
+  {
+    id: 6,
+    zh: "Halo / Blockage / Channel 设置",
+    en: "Halos, Placement/Routing Blockages",
+    score: 8,
+    desc: "为 macro 添加 halo（keepout 区域）、设置 hard/soft/partial blockage、规划 channel 内的 routing/placement 约束。",
+    cmds: ["createPlaceHalo", "createPlaceBlockage -type hard|soft|partial", "createRouteBlockage"],
+    inputs: ["macro 放置结果", "项目规范（halo 宽度规则）"],
+    outputs: ["blockage DEF", "halo 报告"],
+    pros: [
+      "规则性极强：'每个 SRAM 周围 halo 5um'这类规则可批量",
+      "脚本化彻底，AI 极擅长",
+      "客观可验证"
+    ],
+    cons: [
+      "少量特殊区域（如 PHY 周围）需特殊处理，需人指出"
+    ],
+    hil: ["特殊区域规则确认"],
+    why: "标准的 AI-friendly 步骤。Agent 应该把项目 halo 规则做成可读 YAML，自动遍历 macro 应用。"
+  },
+  {
+    id: 7,
+    zh: "放置约束 (Placement Constraints)",
+    en: "Density Screens, Regions, Padding",
+    score: 7,
+    desc: "设置 cell padding、density screen、region constraint（把某些模块限制在某区域）、partition。这些约束影响后续 placement 的质量。",
+    cmds: ["setPlaceMode", "createRegion", "setCellPadding", "setInstancePlacementStatus"],
+    inputs: ["架构 partition 信息", "上代经验"],
+    outputs: ["constraint TCL", "region/padding 报告"],
+    pros: [
+      "脚本生成机械化",
+      "AI 可对照模块 hierarchy 自动建议 region",
+      "效果通过 placement run 客观验证"
+    ],
+    cons: [
+      "region 划分本质是架构理解，AI 仅能基于 hierarchy 名称推断",
+      "padding 设置错误会爆 congestion，需经验调参"
+    ],
+    hil: ["关键模块 region 划分"],
+    why: "AI 可以快速给出基于 hierarchy 的 region 草案，但'为什么这个 IP 必须挨着 controller'这类语义还得人补。"
+  },
+  {
+    id: 8,
+    zh: "Power Connect & Trial Route",
+    en: "Macro Power Connection & Trial Routing",
+    score: 8,
+    desc: "把所有 macro 的电源 pin 连到 PG mesh，优化 via stack，跑一次 trial route 评估 routability。",
+    cmds: ["sroute -nets {VDD VSS}", "setSrouteMode", "trial_route", "verify_power_via"],
+    inputs: ["PG mesh", "macro placement", "via rule"],
+    outputs: ["sroute DEF", "trial route congestion 报告"],
+    pros: [
+      "几乎是机械化操作",
+      "结果通过 verify_power_via 客观验证",
+      "trial route 报告解析是 AI 强项"
+    ],
+    cons: [
+      "via stack 优化在先进工艺需要经验调参"
+    ],
+    hil: ["首次跑通后的 routability review"],
+    why: "AI 友好。Agent 可一键跑 sroute + trial route + 生成 congestion summary，让人决定下一步动作。"
+  },
+  {
+    id: 9,
+    zh: "Floorplan Sanity Check",
+    en: "Pre-Placement QoR Check",
+    score: 9,
+    desc: "运行 congestion map、IR drop quick check、preCTS timing、global route overflow 等检查，判断当前 floorplan 是否可以进入 placement 阶段。",
+    cmds: ["report_congestion", "report_power -rail", "timeDesign -preCTS", "report_route -route_type global"],
+    inputs: ["完整 floorplan + PG", "MMMC 配置"],
+    outputs: ["congestion map", "IR drop 报告", "timing summary"],
+    pros: [
+      "报告解析是 AI 的杀手锏",
+      "可自动生成对比表（本次 vs 上次）",
+      "hotspot 定位 / 时序违例归类 AI 比人快"
+    ],
+    cons: [
+      "'是否接受当前 QoR'最终是人的决定（trade-off 判断）"
+    ],
+    hil: ["决定是否进入下一阶段 / 是否回 macro placement"],
+    why: "AI 可读完十几份报告 → 一页 markdown summary → 标 red/yellow/green。建议作为 Agent 的旗舰能力。"
+  },
+  {
+    id: 10,
+    zh: "Floorplan 迭代",
+    en: "Floorplan Iteration",
+    score: 6,
+    desc: "根据 sanity check 结果，调整 macro placement / PG 密度 / halo 大小 / region，重跑评估。常常迭代 3–10 轮。",
+    cmds: ["（混合使用前述命令）"],
+    inputs: ["sanity check 报告", "工程师经验"],
+    outputs: ["新版 floorplan + 决策记录"],
+    pros: [
+      "AI 可提'如果 X 调到 Y 则 Z 改善'的启发式建议",
+      "可自动记录每轮变更与对应 QoR delta，做 A/B"
+    ],
+    cons: [
+      "实质决策仍依赖人工 trade-off（congestion vs timing vs power）",
+      "容易陷入局部最优，需要工程师跳出来重选方向"
+    ],
+    hil: ["每轮迭代方向"],
+    why: "AI 当个好'实验记录员 + 数据可视化助手'最有价值。让人专注判断，让 Agent 跑实验、出对比图、写日志。"
+  },
+  {
+    id: 11,
+    zh: "Sign-off & Handoff",
+    en: "Floorplan Sign-off & Handoff",
+    score: 9,
+    desc: "保存 floorplan DEF / .fp 文件，归档 run 目录，生成最终报告，提交 git，触发下游 placement 阶段。",
+    cmds: ["saveDesign", "write_def", "saveFPlan", "report_*  -file"],
+    inputs: ["最终 floorplan DB", "review 通过标志"],
+    outputs: ["floorplan.def", "归档目录", "handoff 文档", "git commit"],
+    pros: [
+      "完全机械化",
+      "Agent 可自动生成 markdown 形式 handoff 文档",
+      "文件命名 / 目录结构规范化是 AI 强项"
+    ],
+    cons: [
+      "git push / 触发下游需人授权"
+    ],
+    hil: ["最终 sign-off 签字"],
+    why: "AI 可以全包归档 + 文档 + commit message。push / 触发下游必须人点确认（高风险动作）。"
+  }
+];
+
+// === Upgrade paths per step ===
+const UPGRADES = {
+  1: { brief: "已高分。微调方向：MMMC corner 配置走 YAML schema validation，配错直接 fail-fast，不要靠 Innovus log 才发现。" },
+
+  2: {
+    plans: [
+      { name: "方案 A · 多档候选探针 (Probe Sweep)",
+        desc: "AI 自动跑 (util × aspect) 矩阵候选，比如 4 档 utilization × 3 档 aspect = 12 个变体，每个做一次轻量 trial place + congestion 估算 + preCTS WNS，输出对比表让人挑。把'拍 die 尺寸'从直觉决策变成数据决策。" },
+      { name: "方案 B · 约束前置 (Constraint-First Spec)",
+        desc: "强制 spec-agent 在 floorplan 开工前收齐 package_max_die / prev_gen_die / cost_per_mm² / target_util_range，写成 YAML。AI 只在这个 box 内探索，物理上不可能给出违反硬约束的方案。本质是把'AI 看不到的隐性约束'显式化。" },
+      { name: "方案 C · 敏感性曲线 (Sensitivity Curve)",
+        desc: "跑 utilization 60→75% 五档，画出 'util ↑ → congestion hotspot 数 / wirelength / max IR' 曲线。让不可见的工艺阈值变成可视化拐点——人能看到'哪个 util 之后 QoR 陡升'，在数据上做权衡。" }
+    ],
+    note: "三方案叠加最有效：A 给候选 → B 圈范围 → C 给依据。预期评分可从 6 → 8。"
+  },
+
+  3: {
+    plans: [
+      { name: "方案 A · 双模严格分拆 (Two-Mode Split)",
+        desc: "把这一步在 agent 内显式拆成两个完全不同子任务。Block IO 模式：AI 可根据 fanin/fanout cluster 自动分布 boundary pin（这部分 AI 评分能到 8）。Top-Level IO 模式：AI 只做'读 pad_ring.csv → 校验完整性 → 落 loadIoFile TCL'，禁止创造性放置。由 spec 中的 level: block | top 切换。" },
+      { name: "方案 B · 协同设计握手文件 (Co-design Handshake)",
+        desc: "把'封装团队的输出'显式化成 package_constraints.yaml：ball_map、ESD/clamp 间距规则、power IO 对称性要求、forbidden_zones。AI 解析这个文件做放置 + 校验。用'文件协议'代替'AI 猜测'。" },
+      { name: "方案 C · Lint + Suggest (质检员)",
+        desc: "即便 IO 由人手放，AI 也能做 24/7 lint：检测 ESD 间距违规、power IO 不对称、ball 顺序错配等，给最小化修改建议。把 AI 从'决策者'压回'质检员'，价值反而稳定。" }
+    ],
+    note: "A 决定边界、B 喂数据、C 兜底质量。Top 层不要让 AI 创造，只校验。预期评分 5 → 7。"
+  },
+
+  4: { brief: "已较高分。提分关键：把项目 PG 模板沉淀为版本化 YAML，记录每个 stripe 的宽度/间距/层次理由。project_maturity 高时自动应用模板，可达 8+。新工艺第一次则退回'AI 给候选 + 人选'模式。" },
+
+  5: {
+    plans: [
+      { name: "方案 A · 信息提供者 (Don't Generate, Just Inform)",
+        desc: "AI 不出任何 placement 方案，只生成决策素材：connectivity matrix、fanin/fanout heatmap、flyline 预测图、port 朝向 / clock domain / power domain 表。完全规避 anchoring，让人保留 100% 创造权。" },
+      { name: "方案 B · 评审员模式 (Critique-Only)",
+        desc: "PostToolUse hook：floorplan.def 改动 → 自动跑 trial_route + report_congestion + preCTS timeDesign → 生成本版 vs 上版 diff 表，标红 regression 并归因。把 AI 当 24/7 reviewer 比当 designer 价值高得多。强烈建议作为基础能力。" },
+      { name: "方案 C · 多候选 + 帕累托 (Multi-Candidate Search)",
+        desc: "接收人工硬约束 → Agent 并发跑 N=8~16 个 place_design -concurrent_macros 变体（不同 seed/策略） → 算 5 维指标 (WL, congestion, IR, channel, slack) → 筛 Pareto frontier 3-5 个非支配解 → side-by-side 让人选。用'广度'换'深度'，绕开 anchoring。" },
+      { name: "方案 D · 案例检索 / 模式库 (Pattern Library)",
+        desc: "沉淀历史项目的 floorplan + 'why we did this' 文字 + 标签到 patterns/ 目录。新设计来时检索最相似 pattern，AI 提'Project X 的 L2 cache cluster 和你这个很像（连接度 0.78），他们的做法是...'。长期最值得投资的方向。" },
+      { name: "方案 E · 渐进分组对话 (Progressive Dialogue)",
+        desc: "按 hierarchy / clock / power domain 自动分组。AI 带着人一组一组走：显示 fanin → 提候选放置方向 → 人选 → 落 placeholder + 决策记录 → 下一组。把'灵感型大决策'拆成多个'选择题型小决策'。" }
+    ],
+    note: "强烈建议组合：B（常开）+ A（macro 阶段强制）+ D（持续沉淀）+ E 或 C 二选一。反模式：让 AI 单方面生成完整 placement 然后让人改。"
+  },
+
+  6: { brief: "已高分。微调：把项目 halo 规则做成可读 YAML（每种 macro type 对应 halo 宽度 / blockage 类型），遍历 macro 自动应用，异常区域 flag 出来让人确认。" },
+
+  7: { brief: "已较高分。提分关键：让 AI 学会读 RTL hierarchy 命名约定（比如 u_l2_cache_*），自动建议 region 草案，人审核并补'为什么这个 IP 必须挨着 controller'这类语义。预期可达 8。" },
+
+  8: { brief: "已高分。微调：via stack 优化规则沉淀为模板（不同金属层组合的标准 via 方案）。trial route 结果用统一 summary 模板回报。" },
+
+  9: { brief: "已高分。建议作为 Agent 旗舰能力：一页 markdown summary + red/yellow/green 标记 + 与上次的 diff + hotspot 归因。让人 30 秒就能决定'下一步动作'。" },
+
+  10: {
+    plans: [
+      { name: "方案 A · A/B 自动对照 + 归因引擎",
+        desc: "saveDesign hook 触发：自动生成迭代 diff（wirelength、congestion、IR、WNS 全维度），并归因到具体变更——例如 'SRAM_BANK_4 向北平移 30um 释放了 channel 但拉远了与 controller 距离，导致 WNS -12ps'。让人看到代价，不只看数字。" },
+      { name: "方案 B · 症状-药方启发式库 (Heuristic Catalogue)",
+        desc: "项目级 YAML 库：symptom (如 congestion_M3_horizontal > 2%) → candidate_actions (增加 channel / 加宽 PG 间距) + evidence_pattern。每次 sanity check 后 AI 自动匹配 → 列候选 tweak。本质是把 PD 工程师的'诊断手册'显式化。" },
+      { name: "方案 C · 局部最优逃逸提案 (Escape Proposal)",
+        desc: "设阈值：连续 N 轮（如 3 轮）QoR 改善 < 5% → AI 主动跳出来说'当前路径收益递减，建议回 macro placement 大改'，并给'若重新对称化 / 翻转 X 轴会如何'的离线 sketch。强制打破'再调一下肯定能好'心理。" },
+      { name: "方案 D · 决策树可视化 (Decision Tree View)",
+        desc: "把多版本 floorplan 画成树（父子关系 + 各节点 metrics），人能直观看到'哪个分支死掉了'，并支持'回到节点 5 重新分叉'。把迭代历史从线性变成可探索结构。" }
+    ],
+    note: "A + B 是基础常开；C 在长项目里至关重要；D 适合需要复盘 / 多分支并行尝试的团队。预期评分 6 → 8。"
+  },
+
+  11: { brief: "已高分。约束：git push / 触发下游 placement 必须显式人审核（高 blast radius 动作）。AI 可自动生成 handoff markdown + commit message 草稿。" }
+};
+
+function renderUpgrades(id) {
+  const u = UPGRADES[id];
+  if (!u) return '';
+  if (u.brief) {
+    return `<div class="upgrades">
+      <h4>🚀 如何提分 (Upgrade Path)</h4>
+      <div class="upgrade-brief">${u.brief}</div>
+    </div>`;
+  }
+  return `<div class="upgrades">
+    <h4>🚀 如何提分 (Upgrade Paths · ${u.plans.length} 个方案)</h4>
+    <div class="plan-list">
+      ${u.plans.map(p => `
+        <div class="plan">
+          <div class="plan-name">${p.name}</div>
+          <div class="plan-desc">${p.desc}</div>
+        </div>
+      `).join("")}
+    </div>
+    ${u.note ? `<div class="plan-note">💡 ${u.note}</div>` : ''}
+  </div>`;
+}
+
+// === Render ===
+function scoreClass(s) {
+  if (s >= 8) return "score-good";
+  if (s >= 6) return "score-mid";
+  return "score-low";
+}
+function scoreCategory(s) {
+  if (s >= 8) return "good";
+  if (s >= 6) return "mid";
+  return "low";
+}
+
+function renderSummary() {
+  const total = STEPS.length;
+  const avg = (STEPS.reduce((a, s) => a + s.score, 0) / total).toFixed(1);
+  const good = STEPS.filter(s => s.score >= 8).length;
+  const mid = STEPS.filter(s => s.score >= 6 && s.score < 8).length;
+  const low = STEPS.filter(s => s.score < 6).length;
+  document.getElementById("avgScore").innerHTML = `${avg}<span class="unit">/ 10</span>`;
+  document.getElementById("goodCount").innerHTML = `${good}<span class="unit">个 · AI 可主导</span>`;
+  document.getElementById("lowCount").innerHTML = `${low}<span class="unit">个 · 需人主导</span>`;
+  document.getElementById("cnt-all").textContent = total;
+  document.getElementById("cnt-good").textContent = good;
+  document.getElementById("cnt-mid").textContent = mid;
+  document.getElementById("cnt-low").textContent = low;
+}
+
+function renderTimeline() {
+  const el = document.getElementById("timeline");
+  el.innerHTML = STEPS.map(s => `
+    <div class="tl-cell" data-target="step-${s.id}" title="${s.zh}">
+      <span class="num">Step ${s.id}</span>
+      <span class="score ${scoreClass(s.score)}" style="background:${s.score>=8?'rgba(63,185,80,0.18)':s.score>=6?'rgba(210,153,34,0.18)':'rgba(248,81,73,0.18)'}; color:${s.score>=8?'var(--good)':s.score>=6?'var(--mid)':'var(--warn)'}">${s.score}</span>
+    </div>
+  `).join("");
+  el.querySelectorAll(".tl-cell").forEach(c => {
+    c.addEventListener("click", () => {
+      const id = c.dataset.target;
+      const stepEl = document.getElementById(id);
+      stepEl.classList.add("open");
+      stepEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  });
+}
+
+function renderSteps() {
+  const el = document.getElementById("steps");
+  el.innerHTML = STEPS.map(s => `
+    <div class="step" id="step-${s.id}" data-cat="${scoreCategory(s.score)}">
+      <div class="step-head">
+        <div class="step-num">${s.id}</div>
+        <div class="step-title">
+          <div class="zh">${s.zh}</div>
+          <div class="en">${s.en}</div>
+        </div>
+        <div class="score-badge ${scoreClass(s.score)}">
+          <span class="dot"></span> AI 辅助评分 ${s.score} / 10
+        </div>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+      </div>
+      <div class="step-body">
+        <p style="margin-top:14px;">${s.desc}</p>
+
+        <div class="grid-2">
+          <div class="block">
+            <h4>输入 (Inputs)</h4>
+            <ul>${s.inputs.map(i => `<li>${i}</li>`).join("")}</ul>
+          </div>
+          <div class="block">
+            <h4>输出 (Outputs)</h4>
+            <ul>${s.outputs.map(i => `<li>${i}</li>`).join("")}</ul>
+          </div>
+        </div>
+
+        <div class="block" style="margin-top:12px;">
+          <h4>典型 Innovus 命令</h4>
+          <div style="display:flex; flex-wrap:wrap; gap:6px;">
+            ${s.cmds.map(c => `<code>${c}</code>`).join("")}
+          </div>
+        </div>
+
+        <div class="pros-cons">
+          <div class="pros">
+            <h4>✓ AI 强项</h4>
+            <ul>${s.pros.map(i => `<li>${i}</li>`).join("")}</ul>
+          </div>
+          <div class="cons">
+            <h4>✗ AI 弱项 / 风险</h4>
+            <ul>${s.cons.map(i => `<li>${i}</li>`).join("")}</ul>
+          </div>
+        </div>
+
+        <div class="block" style="margin-top:12px;">
+          <h4>👤 人在回环触点 (Human-in-the-Loop)</h4>
+          <div>${s.hil.map(h => `<span class="hil-tag">${h}</span>`).join("")}</div>
+        </div>
+
+        <div class="why">
+          <h4>为什么给 ${s.score} 分？</h4>
+          <p>${s.why}</p>
+        </div>
+
+        ${renderUpgrades(s.id)}
+      </div>
+    </div>
+  `).join("");
+
+  // toggle expand
+  el.querySelectorAll(".step-head").forEach(h => {
+    h.addEventListener("click", () => {
+      h.parentElement.classList.toggle("open");
+    });
+  });
+}
+
+function initFilters() {
+  document.querySelectorAll(".chip[data-filter]").forEach(b => {
+    b.addEventListener("click", () => {
+      document.querySelectorAll(".chip[data-filter]").forEach(x => x.classList.remove("active"));
+      b.classList.add("active");
+      const f = b.dataset.filter;
+      document.querySelectorAll(".step").forEach(s => {
+        if (f === "all" || s.dataset.cat === f) s.classList.remove("hidden");
+        else s.classList.add("hidden");
+      });
+    });
+  });
+  document.getElementById("toggleAll").addEventListener("click", (e) => {
+    const allOpen = [...document.querySelectorAll(".step:not(.hidden)")]
+      .every(s => s.classList.contains("open"));
+    document.querySelectorAll(".step:not(.hidden)").forEach(s => {
+      if (allOpen) s.classList.remove("open");
+      else s.classList.add("open");
+    });
+    e.target.textContent = allOpen ? "全部展开" : "全部收起";
+  });
+}
+
+renderSummary();
+renderTimeline();
+renderSteps();
+initFilters();
+</script>
+</body>
+</html>

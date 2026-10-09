@@ -1,0 +1,20 @@
+# ===========================================================================
+# scan_reorder.tcl  —  golden template, rendered by render-tcl
+#   Mechanical step: reorder the scan chains to minimize wirelength after
+#   placement. No decision layer — params come straight from the stage spec.
+#   double-brace placeholders filled from stage spec + parameters + --var.
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- scan reorder controls -------------------------------------------------
+setScanReorderMode -keep_clock_grouping {{scan_keep_clock_grouping}}
+set_db scan_reorder_effort {{scan_reorder_effort}}
+
+# --- reorder scan chains by placement to cut scan-net wirelength -----------
+scanReorder
+
+# --- legalize after scan reorder -------------------------------------------
+refinePlace
+
+# --- persist the design with reordered scan chains -------------------------
+defOut {{artifact_dir}}/placed_scan.def

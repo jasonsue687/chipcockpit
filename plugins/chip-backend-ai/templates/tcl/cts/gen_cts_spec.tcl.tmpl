@@ -1,0 +1,36 @@
+# ===========================================================================
+# gen_cts_spec.tcl  —  golden template, rendered by render-tcl
+#   AI-decision step (cts-design): emit the CTS / CCOpt clock-tree spec —
+#   target skew, clock-net non-default routing rule (NDR), clock buffer/inverter
+#   leaf cells, skew groups, and excluded pins. This step PRODUCES a CTS spec
+#   artifact (cts.spec), NOT a .def; the downstream build_clock_tree step reads it.
+#   double-brace placeholders filled from stage spec + decisions(params) + --var;
+#   '### @inject:<block>' injects AI-authored fragments from decisions.fragments
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- non-default routing rule for clock nets (wider/spaced for low skew) ----
+create_route_rule -name {{ndr_name}} \
+    -spacing_multiplier {{ndr_spacing_mult}} \
+    -width_multiplier {{ndr_width_mult}}
+
+# --- clock-tree leaf / buffer cell library (the cells CTS may use) ----------
+set_ccopt_property buffer_cells { {{clock_buffer_cell}} }
+set_ccopt_property inverter_cells { {{clock_inverter_cell}} }
+set_ccopt_property use_inverters {{use_inverters}}
+set_ccopt_property routing_rule {{ndr_name}}
+
+# --- global skew / insertion-delay targets ----------------------------------
+set_ccopt_property target_skew {{target_skew_ps}}ps
+set_ccopt_property target_max_trans {{target_max_trans_ps}}ps
+set_ccopt_property max_fanout {{max_fanout}}
+
+# --- skew group (balance this clock domain together) ------------------------
+create_ccopt_skew_group -name {{skew_group}} -sources [all_clocks]
+
+# --- AI-authored extra ccopt properties / skew groups / exclude pins --------
+# (e.g. set_ccopt_property -pin <pin> sink_type exclude  for I/O or gated pins)
+### @inject:extra_ccopt_props
+
+# --- materialize the CTS clock-tree spec ------------------------------------
+create_ccopt_clock_tree_spec -file {{artifact_dir}}/cts.spec

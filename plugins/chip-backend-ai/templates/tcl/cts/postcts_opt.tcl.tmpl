@@ -1,0 +1,28 @@
+# ===========================================================================
+# postcts_opt.tcl  —  golden template, rendered by render-tcl
+#   Mechanical step: post-CTS optimization — fix hold, recover setup, and clean
+#   up design-rule violations (DRV: max_tran / max_cap) on the propagated clock.
+#   Then summarize clock-tree quality (skew / insertion delay) into the gate
+#   report. No decision layer — params come straight from the stage spec.
+#   double-brace placeholders filled from stage spec + parameters + --var.
+#   Produces cts_opt.def AND clock_tree.rpt.
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- switch to propagated clock for post-CTS timing -----------------------
+set_interactive_constraint_modes [all_constraint_modes -active]
+update_constraint_mode -name [current_constraint_mode] -ideal_clock_off
+
+# --- post-CTS hold fix + setup recovery + DRV cleanup ----------------------
+setOptMode -fixHoldAllowSetupTnsDegrade {{allow_setup_degrade}}
+setOptMode -holdTargetSlack {{hold_target_slack_ns}}
+setOptMode -setupTargetSlack {{setup_target_slack_ns}}
+optDesign -postCTS -hold
+optDesign -postCTS -setup
+optDesign -postCTS -drv
+
+# --- summarize clock-tree quality (skew / insertion delay) into the report -
+report_clock_trees -file {{report_dir}}/clock_tree.rpt
+
+# --- persist the post-CTS optimized design ---------------------------------
+defOut {{artifact_dir}}/cts_opt.def

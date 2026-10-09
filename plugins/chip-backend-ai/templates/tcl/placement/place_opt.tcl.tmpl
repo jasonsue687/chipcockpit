@@ -1,0 +1,34 @@
+# ===========================================================================
+# place_opt.tcl  —  golden template, rendered by render-tcl
+#   AI-decision step (placement-design): standard-cell global placement +
+#   optimization — utilization margin, congestion-driven effort, HFNS, and
+#   tie-cell insertion. Produces placed.def.
+#   double-brace placeholders filled from stage spec + decisions(params) + --var;
+#   '### @inject:<block>' injects AI-authored fragments from decisions.fragments
+# Innovus-style skeleton (structure over fidelity; not validated for real runs)
+# ===========================================================================
+
+# --- placement effort / utilization-margin controls ------------------------
+setPlaceMode -place_global_uniform_density true
+setPlaceMode -place_global_max_density [expr 1.0 - {{target_utilization_margin}}]
+setPlaceMode -place_global_cong_effort {{congestion_effort}}
+setPlaceMode -place_global_timing_effort {{place_global_timing_effort}}
+
+# --- high-fanout-net synthesis (HFNS) during global place ------------------
+setPlaceMode -place_global_max_fanout {{hfns_threshold_fanout}}
+
+# --- AI-authored extra placement options (blockages / partitions / modes) --
+### @inject:extra_place_options
+
+# --- global placement + timing-driven optimization -------------------------
+placeDesign
+place_opt_design
+
+# --- tie-high / tie-low insertion for constant pins ------------------------
+addTieHiLo -cell {{tie_cell}}
+
+# --- incremental placement legalization ------------------------------------
+refinePlace
+
+# --- persist the placed design ---------------------------------------------
+defOut {{artifact_dir}}/placed.def

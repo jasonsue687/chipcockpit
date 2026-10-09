@@ -1,0 +1,19 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "chip-backend-ai",
+  "version": "0.1.0",
+  "description": "ChipCockpit marketplace: AI assistant for chip physical design (simulated EDA flows).",
+  "owner": {
+    "name": "ChipCockpit",
+    "email": "contact@chipcockpit.org"
+  },
+  "plugins": [
+    {
+      "name": "chip-backend-ai",
+      "description": "AI assistant for chip physical design (PD): progressive disclosure of EDA User Guides and expert knowledge base to avoid context overflow.",
+      "version": "0.4.6",
+      "source": "./plugins/chip-backend-ai",
+      "category": "development"
+    }
+  ]
+}

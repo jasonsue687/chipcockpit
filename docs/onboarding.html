@@ -1,0 +1,1581 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>chip-backend-ai · 新人开发指南</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --bg-2: #161b22;
+    --bg-3: #1f2630;
+    --border: #2a3340;
+    --fg: #e6edf3;
+    --fg-dim: #9aa7b4;
+    --accent: #58a6ff;
+    --accent-2: #79c0ff;
+    --green: #56d364;
+    --orange: #ffa657;
+    --pink: #ff7b72;
+    --purple: #d2a8ff;
+    --yellow: #f0e68c;
+    --shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  }
+  [data-theme="light"] {
+    --bg: #fafbfc;
+    --bg-2: #ffffff;
+    --bg-3: #f3f6f9;
+    --border: #d8dee4;
+    --fg: #1f2328;
+    --fg-dim: #57606a;
+    --accent: #0969da;
+    --accent-2: #218bff;
+    --green: #1a7f37;
+    --orange: #bc4c00;
+    --pink: #cf222e;
+    --purple: #8250df;
+    --yellow: #9a6700;
+    --shadow: 0 4px 16px rgba(31, 35, 40, 0.08);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.65;
+    scroll-behavior: smooth;
+  }
+  code, pre, .mono {
+    font-family: "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+    font-size: 0.92em;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    min-height: 100vh;
+  }
+  /* ===== Sidebar ===== */
+  aside {
+    position: sticky; top: 0; height: 100vh;
+    background: var(--bg-2);
+    border-right: 1px solid var(--border);
+    padding: 20px 14px;
+    overflow-y: auto;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 16px;
+    padding: 8px 6px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 14px;
+  }
+  .brand-logo {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), var(--purple));
+    display: grid; place-items: center;
+    color: #fff; font-weight: 700; font-size: 18px;
+  }
+  .brand-title {
+    font-weight: 700; font-size: 15px; line-height: 1.2;
+  }
+  .brand-sub {
+    color: var(--fg-dim); font-size: 12px;
+  }
+  nav ul { list-style: none; padding: 0; margin: 0; }
+  nav li > a {
+    display: block;
+    padding: 8px 12px;
+    border-radius: 6px;
+    color: var(--fg-dim);
+    text-decoration: none;
+    font-size: 14px;
+    margin-bottom: 2px;
+    transition: all 0.15s;
+  }
+  nav li > a:hover { background: var(--bg-3); color: var(--fg); }
+  nav li > a.active { background: var(--bg-3); color: var(--accent); font-weight: 600; }
+  nav .nav-sub { padding-left: 14px; font-size: 13px; }
+  nav .nav-sub a { padding: 5px 10px; }
+  .sidebar-footer {
+    margin-top: 24px; padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 12px; color: var(--fg-dim);
+  }
+  .theme-toggle {
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+    color: var(--fg);
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    width: 100%;
+  }
+  .theme-toggle:hover { border-color: var(--accent); }
+  /* ===== Main ===== */
+  main {
+    padding: 40px 56px;
+    max-width: 1100px;
+    width: 100%;
+  }
+  h1 {
+    font-size: 2.2em;
+    margin: 0 0 8px;
+    background: linear-gradient(90deg, var(--accent), var(--purple));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  h2 {
+    font-size: 1.55em;
+    margin: 36px 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 { font-size: 1.2em; margin: 24px 0 10px; color: var(--accent-2); }
+  h4 { font-size: 1.02em; margin: 18px 0 8px; color: var(--fg); }
+  p { margin: 10px 0; }
+  a { color: var(--accent); }
+  ul, ol { padding-left: 22px; }
+  li { margin: 4px 0; }
+  hr {
+    border: 0; height: 1px;
+    background: var(--border);
+    margin: 28px 0;
+  }
+  /* ===== Hero ===== */
+  .hero {
+    background: linear-gradient(135deg, var(--bg-2), var(--bg-3));
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px 32px;
+    margin-bottom: 28px;
+    box-shadow: var(--shadow);
+  }
+  .hero-tags {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    margin-top: 14px;
+  }
+  .tag {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+    color: var(--fg-dim);
+  }
+  .tag.accent { color: var(--accent); border-color: var(--accent); }
+  .tag.green { color: var(--green); border-color: var(--green); }
+  .tag.purple { color: var(--purple); border-color: var(--purple); }
+  /* ===== Cards ===== */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    margin: 18px 0;
+  }
+  .card {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    transition: transform 0.18s, border-color 0.18s;
+  }
+  .card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+  }
+  .card-title { font-weight: 700; font-size: 1.05em; margin-bottom: 6px; }
+  .card-title .icon { margin-right: 6px; }
+  .card-body { color: var(--fg-dim); font-size: 0.95em; }
+  /* ===== Callouts ===== */
+  .callout {
+    border-left: 4px solid var(--accent);
+    background: var(--bg-2);
+    padding: 12px 16px;
+    margin: 16px 0;
+    border-radius: 4px;
+    font-size: 0.95em;
+  }
+  .callout.warn { border-color: var(--orange); }
+  .callout.danger { border-color: var(--pink); }
+  .callout.tip { border-color: var(--green); }
+  .callout-title {
+    font-weight: 700;
+    margin-bottom: 4px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  /* ===== Code block ===== */
+  .code-wrap {
+    position: relative;
+    margin: 12px 0;
+  }
+  pre {
+    background: #0d1117;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    color: #e6edf3;
+    margin: 0;
+  }
+  [data-theme="light"] pre {
+    background: #f6f8fa;
+    color: #1f2328;
+  }
+  pre code { background: transparent; padding: 0; color: inherit; }
+  .code-lang {
+    position: absolute;
+    top: 6px; right: 50px;
+    font-size: 11px;
+    color: var(--fg-dim);
+    background: var(--bg-3);
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .copy-btn {
+    position: absolute;
+    top: 6px; right: 6px;
+    background: var(--bg-3);
+    color: var(--fg-dim);
+    border: 1px solid var(--border);
+    padding: 4px 8px;
+    border-radius: 5px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .copy-btn.copied { color: var(--green); border-color: var(--green); }
+  /* inline code */
+  p code, li code, td code {
+    background: var(--bg-3);
+    padding: 1px 6px;
+    border-radius: 4px;
+    color: var(--orange);
+    font-size: 0.9em;
+  }
+  /* keyword colors inside pre */
+  .k-cmd { color: var(--accent-2); }
+  .k-flag { color: var(--purple); }
+  .k-str { color: var(--green); }
+  .k-cmt { color: var(--fg-dim); font-style: italic; }
+  .k-warn { color: var(--orange); }
+  /* ===== Tabs ===== */
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    margin: 14px 0 0;
+  }
+  .tab-btn {
+    background: transparent;
+    border: none;
+    color: var(--fg-dim);
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 14px;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .tab-btn:hover { color: var(--fg); }
+  .tab-btn.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    font-weight: 600;
+  }
+  .tab-panel { display: none; padding: 14px 0; }
+  .tab-panel.active { display: block; }
+  /* ===== Collapsible ===== */
+  details {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin: 12px 0;
+  }
+  details > summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--accent);
+    user-select: none;
+    list-style: none;
+  }
+  details > summary::before {
+    content: "▶";
+    display: inline-block;
+    margin-right: 8px;
+    transition: transform 0.15s;
+    font-size: 0.75em;
+  }
+  details[open] > summary::before { transform: rotate(90deg); }
+  /* ===== Step list ===== */
+  .steps { counter-reset: step; padding: 0; list-style: none; }
+  .step {
+    position: relative;
+    padding-left: 48px;
+    margin: 18px 0;
+    counter-increment: step;
+  }
+  .step::before {
+    content: counter(step);
+    position: absolute;
+    left: 0; top: 0;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--purple));
+    color: #fff;
+    font-weight: 700;
+    display: grid; place-items: center;
+    box-shadow: var(--shadow);
+  }
+  .step h4 { margin-top: 4px; }
+  /* ===== Table ===== */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    font-size: 0.95em;
+  }
+  th, td {
+    text-align: left;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  th { background: var(--bg-3); font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg-3); }
+  /* ===== SVG diagram ===== */
+  .diagram-wrap {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin: 18px 0;
+    overflow-x: auto;
+  }
+  .diagram-wrap svg { display: block; margin: 0 auto; max-width: 100%; }
+  .diagram-caption {
+    text-align: center;
+    color: var(--fg-dim);
+    font-size: 13px;
+    margin-top: 8px;
+  }
+  /* ===== TOC progress ===== */
+  .progress {
+    position: fixed; top: 0; left: 0;
+    height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent), var(--purple));
+    z-index: 1000;
+    transition: width 0.1s;
+  }
+  /* ===== Quiz / FAQ ===== */
+  .quiz-card {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin: 12px 0;
+  }
+  .quiz-q { font-weight: 600; margin-bottom: 10px; }
+  .quiz-opts { display: flex; flex-direction: column; gap: 6px; }
+  .quiz-opt {
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    text-align: left;
+    color: var(--fg);
+    transition: all 0.15s;
+  }
+  .quiz-opt:hover { border-color: var(--accent); }
+  .quiz-opt.correct {
+    background: rgba(86, 211, 100, 0.12);
+    border-color: var(--green);
+    color: var(--green);
+  }
+  .quiz-opt.wrong {
+    background: rgba(255, 123, 114, 0.12);
+    border-color: var(--pink);
+    color: var(--pink);
+  }
+  .quiz-feedback {
+    margin-top: 10px;
+    font-size: 0.92em;
+    color: var(--fg-dim);
+    min-height: 1em;
+  }
+  /* ===== Misc ===== */
+  kbd {
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-family: monospace;
+    font-size: 0.85em;
+  }
+  .checklist { list-style: none; padding-left: 0; }
+  .checklist li {
+    padding-left: 28px;
+    position: relative;
+    margin: 6px 0;
+  }
+  .checklist li::before {
+    content: "✓";
+    position: absolute;
+    left: 4px; top: 0;
+    color: var(--green);
+    font-weight: 700;
+  }
+  .x-list li::before { content: "✗"; color: var(--pink); }
+  /* ===== Chat bubble (Claude Code 会话示意) ===== */
+  .chat {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    margin: 14px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .chat-msg {
+    padding: 10px 14px;
+    border-radius: 12px;
+    max-width: 90%;
+    font-size: 0.94em;
+    line-height: 1.55;
+  }
+  .chat-msg.user {
+    background: var(--bg-3);
+    align-self: flex-end;
+    border-bottom-right-radius: 3px;
+  }
+  .chat-msg.ai {
+    background: linear-gradient(135deg, rgba(88, 166, 255, 0.10), rgba(210, 168, 255, 0.10));
+    border: 1px solid var(--border);
+    align-self: flex-start;
+    border-bottom-left-radius: 3px;
+  }
+  [data-theme="light"] .chat-msg.ai {
+    background: linear-gradient(135deg, rgba(9, 105, 218, 0.06), rgba(130, 80, 223, 0.06));
+  }
+  .chat-msg .who {
+    display: block;
+    font-size: 11px;
+    color: var(--fg-dim);
+    margin-bottom: 4px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+  .chat-msg pre {
+    margin: 6px 0 2px;
+    font-size: 0.85em;
+    padding: 8px 10px;
+    border-radius: 6px;
+  }
+  .chat-msg code { font-size: 0.92em; }
+  /* ===== Mini flow diagram ===== */
+  .flow-mini {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 16px 0;
+  }
+  .flow-node {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    text-align: center;
+    min-width: 130px;
+  }
+  .flow-node.hi { border-color: var(--accent); color: var(--accent); }
+  .flow-node.hi2 { border-color: var(--purple); color: var(--purple); }
+  .flow-node.hi3 { border-color: var(--green); color: var(--green); }
+  .flow-arrow {
+    color: var(--fg-dim);
+    font-size: 18px;
+    font-weight: 700;
+  }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    aside { position: relative; height: auto; }
+    main { padding: 24px 18px; }
+    .grid-2 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="progress" id="progress"></div>
+
+<div class="layout">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside>
+    <div class="brand">
+      <div class="brand-logo">CB</div>
+      <div>
+        <div class="brand-title">chip-backend-ai</div>
+        <div class="brand-sub">新人开发指南 · v1.0</div>
+      </div>
+    </div>
+    <nav>
+      <ul>
+        <li><a href="#intro" class="active">🚀 项目介绍</a></li>
+        <li><a href="#concepts">🎯 两个核心概念</a>
+          <ul class="nav-sub">
+            <li><a href="#concept-plugin">· 插件开发</a></li>
+            <li><a href="#concept-project">· 项目开发</a></li>
+          </ul>
+        </li>
+        <li><a href="#bridge">🔗 桥梁：插件接入 Claude Code</a></li>
+        <li><a href="#setup">🛠️ 环境准备</a></li>
+        <li><a href="#git-flow">🌳 Git 协作流程</a>
+          <ul class="nav-sub">
+            <li><a href="#git-diagram">· 协作示意图</a></li>
+            <li><a href="#git-clone">· 克隆仓库</a></li>
+            <li><a href="#plugin-link">· 注册本地 plugin</a></li>
+            <li><a href="#git-branch">· 创建分支</a></li>
+            <li><a href="#git-commit">· 改动 & 提交（让 AI 来）</a></li>
+            <li><a href="#git-push">· 推送 & 发 PR（让 AI 来）</a></li>
+            <li><a href="#git-sync">· 同步远程</a></li>
+          </ul>
+        </li>
+        <li><a href="#cheatsheet">📋 命令速查</a></li>
+        <li><a href="#faq">❓ 常见问题</a></li>
+        <li><a href="#quiz">🧠 自检小测</a></li>
+      </ul>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="theme-toggle" id="themeToggle">🌙 切换浅色模式</button>
+      <p style="margin-top:12px;">
+        Repo: <a href="https://github.com/jasonsue687/chip-backend-ai" target="_blank">jasonsue687/chip-backend-ai</a>
+      </p>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main>
+
+    <!-- ===== Hero ===== -->
+    <section class="hero">
+      <h1>欢迎加入 chip-backend-ai 🎉</h1>
+      <p style="font-size: 1.05em; color: var(--fg-dim);">
+        这是一份给新人的快速上手指南。读完后，你将明白这个项目是什么、自己应该开发什么、
+        如何与团队基于 Git 高效协作。预计阅读时间：<b>15–20 分钟</b>。
+      </p>
+      <div class="hero-tags">
+        <span class="tag accent">Claude Code Plugin</span>
+        <span class="tag green">Python</span>
+        <span class="tag purple">EDA / 物理设计</span>
+        <span class="tag">Git Workflow</span>
+      </div>
+    </section>
+
+    <!-- ============ 项目介绍 ============ -->
+    <section id="intro">
+      <h2>🚀 项目介绍</h2>
+
+      <p>
+        <b>chip-backend-ai</b> 是一个 <b>Claude Code 插件</b>，目标是给芯片<b>物理设计（后端）</b>
+        工程师提供一个智能助理：既能查 EDA 文档、又能自主驱动后端流程。
+      </p>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title"><span class="icon">📚</span>知识子系统</div>
+          <div class="card-body">
+            一个渐进式披露的知识库，覆盖 Cadence Innovus 等 EDA 工具。包含 6 个 Skill：
+            浏览专家文档、按层级导航 User Guide、查 Tcl 命令、解释 EDA 概念、PDF 转 Markdown。
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="icon">🤖</span>编排子系统</div>
+          <div class="card-body">
+            一套自治的后端流程引擎。状态机驱动 + 子 Agent 分工（Spec、Floorplan、CTS、Route、
+            Timing ECO），人在关键节点介入审批，文件系统作为 handoff 协议。
+          </div>
+        </div>
+      </div>
+
+      <div class="callout tip">
+        <div class="callout-title">💡 推荐阅读顺序</div>
+        <code>README.md</code> → 本指南 → <code>CLAUDE.md</code> →
+        <code>proposals/workflow.md</code>（深入编排器设计时再看）。
+      </div>
+    </section>
+
+    <!-- ============ 两个概念 ============ -->
+    <section id="concepts">
+      <h2>🎯 两个核心概念：插件开发 vs 项目开发</h2>
+
+      <p>
+        这是<b>新人最容易混淆</b>的一点。请先把这两件事在脑子里分清楚：
+      </p>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title" style="color: var(--accent);">
+            <span class="icon">🔧</span>① 插件开发
+          </div>
+          <div class="card-body">
+            <p><b>开发对象：</b>Claude Code 的 plugin 本身（即本仓库）。</p>
+            <p><b>你在改：</b>Skill、Agent、router、knowledge base、workflow 编排逻辑。</p>
+            <p><b>目的：</b>让这个 AI 助理更强、更准。</p>
+            <p><b>谁来做：</b>插件团队 / Plugin maintainer。</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title" style="color: var(--green);">
+            <span class="icon">🏗️</span>② 项目开发
+          </div>
+          <div class="card-body">
+            <p><b>开发对象：</b>一个具体的<b>芯片设计项目</b>。</p>
+            <p><b>你在用：</b>本插件提供的 Skill / Agent / Workflow 来跑后端流程。</p>
+            <p><b>目的：</b>把某颗 SoC / IP 的物理设计跑通。</p>
+            <p><b>谁来做：</b>后端设计工程师 / 使用者。</p>
+          </div>
+        </div>
+      </div>
+
+      <h3 id="concept-plugin">① 插件开发是怎么回事？</h3>
+      <p>
+        Claude Code 的 plugin 通过<b>清单文件 + 自动发现机制</b>注册功能。本仓库内的开发对象包括：
+      </p>
+      <ul>
+        <li><b>Skill</b>（<code>skills/*/SKILL.md</code>）：渐进式披露的能力单元。例如「查 Innovus 命令」就是一个 Skill。</li>
+        <li><b>Agent</b>（<code>agents/*/AGENT.md</code>）：可被编排器调度的子智能体。例如 floorplan-agent。</li>
+        <li><b>Workflow</b>（<code>core/workflow/</code>）：状态机驱动的多阶段编排核心。</li>
+        <li><b>Knowledge base</b>（<code>knowledge/</code>）：专家文档 + PDF 转换后的层级化知识。</li>
+      </ul>
+      <div class="callout">
+        <div class="callout-title">📌 修改插件代码后</div>
+        在 Claude Code 中重新加载插件（<kbd>/plugin</kbd> 或重启），即可生效。
+      </div>
+
+      <h3 id="concept-project">② 项目开发是怎么回事？</h3>
+      <p>
+        当你<b>使用</b>这个插件去跑一颗芯片时，你的工作目录通常是<b>另一个 repo</b>（你的芯片设计 repo）。
+        在那里，你会：
+      </p>
+      <ul>
+        <li>调用 <code>/run-chip-flow</code> 启动后端流程；</li>
+        <li>让 spec-agent 把你的设计需求转成 YAML spec；</li>
+        <li>让 floorplan / cts / route agent 接力执行；</li>
+        <li>在 <code>workspace/</code> 目录看到完整 handoff 文件 + 决策日志。</li>
+      </ul>
+
+      <div class="callout tip">
+        <div class="callout-title">🎓 类比理解</div>
+        把<b>插件开发</b>想象成「造一台数控机床」，把<b>项目开发</b>想象成「用这台机床去加工零件」。
+        本指南后面讲的 Git 协作流程，主要面向<b>插件开发者</b>——也就是你。
+      </div>
+    </section>
+
+    <!-- ============ 桥梁 ============ -->
+    <section id="bridge">
+      <h2>🔗 桥梁：你写的 plugin 是如何被项目开发用上的？</h2>
+
+      <p>
+        新人最常问的问题：「我改了 <code>plugins/chip-backend-ai/</code> 里的代码，跑芯片项目的人怎么就能用上？」<br/>
+        答案是——通过 <b>Claude Code 的 plugin 注册机制</b>把<b>本地仓库目录</b>挂载进去。
+      </p>
+
+      <div class="flow-mini">
+        <div class="flow-node hi">📁 本地仓库<br/><small style="color:var(--fg-dim);">/path/to/chipcockpit</small></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node hi2">🔌 Claude Code<br/><small style="color:var(--fg-dim);">注册为 plugin</small></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node hi3">🏗️ 项目开发会话<br/><small style="color:var(--fg-dim);">/run-chip-flow ...</small></div>
+      </div>
+      <p style="text-align:center; color: var(--fg-dim); font-size: 13px; margin-top: -4px;">
+        本地仓库的任何改动 → Claude Code 立即看到 → 项目会话里可以用最新版本
+      </p>
+
+      <h3>关键事实</h3>
+      <ul>
+        <li>Claude Code 并不会去 GitHub 上拉 plugin，它直接<b>读你本地磁盘上的某个目录</b>。</li>
+        <li>这个目录就是 <code>plugins/chip-backend-ai/</code>（plugin 根，里面有 <code>.claude-plugin/plugin.json</code>）。</li>
+        <li>你<b>修改 → 保存 → reload</b>，新行为立刻在「项目开发」会话里生效，<b>不需要发版、不需要 pip install</b>。</li>
+        <li>因此「插件开发」和「项目开发」其实可以在<b>同一台机器、两个 Claude Code 窗口</b>里并行：一个窗口改 plugin，另一个窗口跑芯片。</li>
+      </ul>
+
+      <h3>怎么挂载？（先有个印象，第 4 节会再操作一次）</h3>
+      <p>在 Claude Code 的会话窗口里，直接对 AI 说：</p>
+
+      <div class="chat">
+        <div class="chat-msg user">
+          <span class="who">👤 你</span>
+          帮我把本地这个目录注册成 plugin：<br/>
+          <code>/path/to/chipcockpit/plugins/chip-backend-ai/</code>
+        </div>
+        <div class="chat-msg ai">
+          <span class="who">🤖 Claude Code</span>
+          好的，使用 <code>/plugin</code> 命令把它登记为本地 plugin … 已注册 ✓<br/>
+          现在你可以使用 <code>/run-chip-flow</code>、<code>/list-expert-topics</code> 等 6 个 Skill。
+        </div>
+      </div>
+
+      <div class="callout">
+        <div class="callout-title">📌 一句话总结</div>
+        <b>本地 git 仓库目录 ≡ 你本地的 plugin 源码</b>。Claude Code 通过路径注册「指向」它，
+        你改它就是改 plugin，你的同事 clone 后挂载自己的本地目录，就拥有了一份独立、可独立修改的 plugin。
+      </div>
+    </section>
+
+    <!-- ============ 环境准备 ============ -->
+    <section id="setup">
+      <h2>🛠️ 环境准备</h2>
+
+      <ol class="steps">
+        <li class="step">
+          <h4>安装 Git 与 Python 3</h4>
+          <p>macOS 通常自带；Linux 用包管理器；Windows 推荐 Git for Windows + Python.org 官方安装包。</p>
+          <div class="code-wrap">
+            <button class="copy-btn">复制</button>
+<pre><code><span class="k-cmd">git</span> --version       <span class="k-cmt"># 应 ≥ 2.30</span>
+<span class="k-cmd">python3</span> --version   <span class="k-cmt"># 应 ≥ 3.9</span></code></pre>
+          </div>
+        </li>
+
+        <li class="step">
+          <h4>配置 Git 身份</h4>
+          <p>第一次使用需要告诉 Git 你是谁。<b>请用真实姓名和公司邮箱</b>，commit 历史里都会出现。</p>
+          <div class="code-wrap">
+            <button class="copy-btn">复制</button>
+<pre><code><span class="k-cmd">git</span> config --global user.name <span class="k-str">"Your Name"</span>
+<span class="k-cmd">git</span> config --global user.email <span class="k-str">"you@company.com"</span>
+<span class="k-cmd">git</span> config --global init.defaultBranch main
+<span class="k-cmd">git</span> config --global pull.rebase false   <span class="k-cmt"># merge 模式（推荐新人）</span></code></pre>
+          </div>
+        </li>
+
+        <li class="step">
+          <h4>配置 GitHub 认证（SSH 推荐）</h4>
+          <p>生成 SSH key 后，把公钥贴到 GitHub → Settings → SSH and GPG keys。</p>
+          <div class="code-wrap">
+            <button class="copy-btn">复制</button>
+<pre><code><span class="k-cmd">ssh-keygen</span> -t ed25519 -C <span class="k-str">"you@company.com"</span>
+<span class="k-cmd">cat</span> ~/.ssh/id_ed25519.pub   <span class="k-cmt"># 复制输出，粘到 GitHub</span>
+<span class="k-cmd">ssh</span> -T git@github.com         <span class="k-cmt"># 测试连通</span></code></pre>
+          </div>
+        </li>
+
+        <li class="step">
+          <h4>安装 Claude Code</h4>
+          <p>参考官方文档 <a href="https://claude.com/claude-code" target="_blank">claude.com/claude-code</a>。
+          安装好后再把<b>本地的</b> <code>chip-backend-ai</code> 仓库注册为 plugin。</p>
+        </li>
+
+        <li class="step">
+          <h4>创建你的工作目录</h4>
+          <p>团队约定所有人的本地仓库都放在 <b><code>/path/to/projects/</code></b> 下，
+          再按自己的<b>用户名</b>建一个子目录（例如 <code>dev-a</code>、<code>dev-b</code>）。</p>
+          <div class="code-wrap">
+            <button class="copy-btn">复制</button>
+<pre><code><span class="k-cmt"># 把下面的 dev-a 换成你自己的用户名</span>
+<span class="k-cmd">mkdir</span> -p /path/to
+<span class="k-cmd">cd</span> /path/to</code></pre>
+          </div>
+          <p style="margin-top:8px; color: var(--fg-dim); font-size: 0.95em;">
+            为什么要统一路径？这样 PSR 工具、CI 脚本、log 路径都能套用同一套模板，遇事互相帮忙时一眼能知道对方在哪儿。
+          </p>
+        </li>
+      </ol>
+    </section>
+
+    <!-- ============ Git 流程 ============ -->
+    <section id="git-flow">
+      <h2>🌳 Git 多人协作流程</h2>
+
+      <p>
+        本仓库托管在 <a href="https://github.com/jasonsue687/chip-backend-ai" target="_blank">GitHub</a>，
+        采用<b>「Fork-less Feature Branch + Pull Request」</b>工作流。
+        每个人在自己<b>本地克隆</b>一份仓库，开<b>独立分支</b>开发，完成后<b>推送</b>并发起 <b>PR</b>。
+      </p>
+
+      <!-- ===== 协作示意图 ===== -->
+      <h3 id="git-diagram">📊 协作示意图</h3>
+      <div class="diagram-wrap">
+        <svg viewBox="0 0 980 560" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, Segoe UI, sans-serif">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5"
+                    markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#58a6ff"/>
+            </marker>
+            <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5"
+                    markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#56d364"/>
+            </marker>
+            <marker id="arrow-orange" viewBox="0 0 10 10" refX="9" refY="5"
+                    markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#ffa657"/>
+            </marker>
+            <linearGradient id="github-grad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#2a3340"/>
+              <stop offset="100%" stop-color="#1f2630"/>
+            </linearGradient>
+          </defs>
+
+          <!-- ===== Remote GitHub (top) ===== -->
+          <g>
+            <rect x="340" y="20" width="300" height="110" rx="14"
+                  fill="url(#github-grad)" stroke="#58a6ff" stroke-width="2"/>
+            <text x="490" y="50" text-anchor="middle" fill="#58a6ff"
+                  font-size="18" font-weight="700">☁️ GitHub Remote (origin)</text>
+            <text x="490" y="74" text-anchor="middle" fill="#e6edf3" font-size="13">
+              jasonsue687/chip-backend-ai
+            </text>
+            <text x="490" y="95" text-anchor="middle" fill="#9aa7b4" font-size="12">
+              main 分支（受保护，只能通过 PR 合并）
+            </text>
+            <text x="490" y="115" text-anchor="middle" fill="#9aa7b4" font-size="11">
+              feat/dev-a-cts · feat/dev-b-fp · fix/dev-c-route ...
+            </text>
+          </g>
+
+          <!-- ===== Dev A (dev-a) ===== -->
+          <g>
+            <rect x="40" y="200" width="270" height="150" rx="12"
+                  fill="#161b22" stroke="#56d364" stroke-width="2"/>
+            <text x="175" y="226" text-anchor="middle" fill="#56d364"
+                  font-size="15" font-weight="700">👩‍💻 用户 dev-a</text>
+            <line x1="60" y1="240" x2="290" y2="240" stroke="#2a3340"/>
+            <text x="60" y="258" fill="#e6edf3" font-size="11">📁 /path/to/projects/</text>
+            <text x="68" y="274" fill="#e6edf3" font-size="11">    dev-a/chip-backend-ai</text>
+            <text x="60" y="292" fill="#9aa7b4" font-size="11">本地仓库（git clone）</text>
+            <text x="60" y="312" fill="#e6edf3" font-size="12">🌿 分支: feat/dev-a-cts</text>
+            <text x="60" y="332" fill="#d2a8ff" font-size="11">🔌 Claude Code plugin → 指向本地</text>
+          </g>
+
+          <!-- ===== Dev B (dev-b) ===== -->
+          <g>
+            <rect x="355" y="200" width="270" height="150" rx="12"
+                  fill="#161b22" stroke="#56d364" stroke-width="2"/>
+            <text x="490" y="226" text-anchor="middle" fill="#56d364"
+                  font-size="15" font-weight="700">🧑‍💻 用户 dev-b</text>
+            <line x1="375" y1="240" x2="605" y2="240" stroke="#2a3340"/>
+            <text x="375" y="258" fill="#e6edf3" font-size="11">📁 /path/to/projects/</text>
+            <text x="383" y="274" fill="#e6edf3" font-size="11">    dev-b/chip-backend-ai</text>
+            <text x="375" y="292" fill="#9aa7b4" font-size="11">本地仓库（git clone）</text>
+            <text x="375" y="312" fill="#e6edf3" font-size="12">🌿 分支: feat/dev-b-fp</text>
+            <text x="375" y="332" fill="#d2a8ff" font-size="11">🔌 Claude Code plugin → 指向本地</text>
+          </g>
+
+          <!-- ===== Dev C (dev-c) ===== -->
+          <g>
+            <rect x="670" y="200" width="270" height="150" rx="12"
+                  fill="#161b22" stroke="#56d364" stroke-width="2"/>
+            <text x="805" y="226" text-anchor="middle" fill="#56d364"
+                  font-size="15" font-weight="700">👨‍💻 用户 dev-c</text>
+            <line x1="690" y1="240" x2="920" y2="240" stroke="#2a3340"/>
+            <text x="690" y="258" fill="#e6edf3" font-size="11">📁 /path/to/projects/</text>
+            <text x="698" y="274" fill="#e6edf3" font-size="11">    dev-c/chip-backend-ai</text>
+            <text x="690" y="292" fill="#9aa7b4" font-size="11">本地仓库（git clone）</text>
+            <text x="690" y="312" fill="#e6edf3" font-size="12">🌿 分支: fix/dev-c-route</text>
+            <text x="690" y="332" fill="#d2a8ff" font-size="11">🔌 Claude Code plugin → 指向本地</text>
+          </g>
+
+          <!-- ===== Arrows: clone (down) ===== -->
+          <path d="M 420 130 Q 380 160 175 200" fill="none" stroke="#58a6ff"
+                stroke-width="2" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+          <path d="M 490 130 L 490 200" fill="none" stroke="#58a6ff"
+                stroke-width="2" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+          <path d="M 560 130 Q 600 160 805 200" fill="none" stroke="#58a6ff"
+                stroke-width="2" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+          <text x="200" y="170" fill="#58a6ff" font-size="11" font-weight="600">git clone / pull</text>
+
+          <!-- ===== Arrows: push & PR (up) ===== -->
+          <path d="M 220 200 Q 280 160 460 130" fill="none" stroke="#ffa657"
+                stroke-width="2" marker-end="url(#arrow-orange)"/>
+          <path d="M 530 200 L 530 130" fill="none" stroke="#ffa657"
+                stroke-width="2" marker-end="url(#arrow-orange)"/>
+          <path d="M 760 200 Q 700 160 530 130" fill="none" stroke="#ffa657"
+                stroke-width="2" marker-end="url(#arrow-orange)"/>
+          <text x="700" y="170" fill="#ffa657" font-size="11" font-weight="600">git push → PR</text>
+
+          <!-- ===== Workflow tags ===== -->
+          <g>
+            <rect x="40" y="400" width="900" height="140" rx="10"
+                  fill="#1f2630" stroke="#2a3340"/>
+            <text x="60" y="425" fill="#e6edf3" font-size="14" font-weight="700">协作工作流（每个人独立循环）</text>
+
+            <g font-size="12">
+              <circle cx="80" cy="460" r="14" fill="#58a6ff"/>
+              <text x="80" y="464" text-anchor="middle" fill="#fff" font-weight="700">1</text>
+              <text x="105" y="464" fill="#e6edf3">clone 一次</text>
+
+              <circle cx="220" cy="460" r="14" fill="#58a6ff"/>
+              <text x="220" y="464" text-anchor="middle" fill="#fff" font-weight="700">2</text>
+              <text x="245" y="464" fill="#e6edf3">git checkout -b feat/...</text>
+
+              <circle cx="430" cy="460" r="14" fill="#58a6ff"/>
+              <text x="430" y="464" text-anchor="middle" fill="#fff" font-weight="700">3</text>
+              <text x="455" y="464" fill="#e6edf3">改代码 + commit</text>
+
+              <circle cx="615" cy="460" r="14" fill="#58a6ff"/>
+              <text x="615" y="464" text-anchor="middle" fill="#fff" font-weight="700">4</text>
+              <text x="640" y="464" fill="#e6edf3">git push origin feat/...</text>
+
+              <circle cx="830" cy="460" r="14" fill="#58a6ff"/>
+              <text x="830" y="464" text-anchor="middle" fill="#fff" font-weight="700">5</text>
+              <text x="855" y="464" fill="#e6edf3">开 PR</text>
+
+              <circle cx="80" cy="510" r="14" fill="#d2a8ff"/>
+              <text x="80" y="514" text-anchor="middle" fill="#fff" font-weight="700">6</text>
+              <text x="105" y="514" fill="#e6edf3">Code Review</text>
+
+              <circle cx="260" cy="510" r="14" fill="#d2a8ff"/>
+              <text x="260" y="514" text-anchor="middle" fill="#fff" font-weight="700">7</text>
+              <text x="285" y="514" fill="#e6edf3">merge 到 main</text>
+
+              <circle cx="440" cy="510" r="14" fill="#d2a8ff"/>
+              <text x="440" y="514" text-anchor="middle" fill="#fff" font-weight="700">8</text>
+              <text x="465" y="514" fill="#e6edf3">大家 git pull 同步最新 main</text>
+
+              <circle cx="700" cy="510" r="14" fill="#56d364"/>
+              <text x="700" y="514" text-anchor="middle" fill="#fff" font-weight="700">↻</text>
+              <text x="725" y="514" fill="#9aa7b4">回到第 2 步，开下一个分支</text>
+            </g>
+          </g>
+        </svg>
+        <div class="diagram-caption">
+          每位开发者持有<b>独立的本地仓库</b>，各自的 Claude Code plugin 指向自己的本地路径；
+          通过<b>独立分支 + PR</b> 收敛到远端 main。
+        </div>
+      </div>
+
+      <div class="callout">
+        <div class="callout-title">🔑 三个关键认知</div>
+        <ol style="margin: 4px 0;">
+          <li>每个人都有<b>完整的本地仓库</b>（不是只下载某几个文件）。</li>
+          <li><b>main 分支永远只通过 PR 合并</b>，禁止直接 push。</li>
+          <li>分支命名要能<b>一眼看出谁在做什么</b>：<code>feat/dev-a-cts-skew</code>、<code>fix/dev-b-router-typo</code>。</li>
+        </ol>
+      </div>
+
+      <!-- ===== Clone ===== -->
+      <h3 id="git-clone">1️⃣ 克隆代码仓库</h3>
+      <p>
+        团队约定所有人的本地仓库都放在 <code>/path/to/&lt;your-username&gt;/</code> 下。
+        下面以用户 <code>dev-a</code> 为例（你换成自己的就好）。
+      </p>
+
+      <div class="tabs" data-tabs="clone">
+        <button class="tab-btn active" data-tab="ssh">SSH（推荐）</button>
+        <button class="tab-btn" data-tab="https">HTTPS</button>
+      </div>
+      <div class="tab-panel active" data-panel="ssh">
+        <div class="code-wrap">
+          <button class="copy-btn">复制</button>
+<pre><code><span class="k-cmt"># 1) 进到自己的用户目录（没有就先 mkdir -p）</span>
+<span class="k-cmd">cd</span> /path/to
+
+<span class="k-cmt"># 2) clone（仓库会落在 ./chip-backend-ai/）</span>
+<span class="k-cmd">git</span> clone git@github.com:jasonsue687/chip-backend-ai.git
+<span class="k-cmd">cd</span> chip-backend-ai
+
+<span class="k-cmt"># 3) 确认 origin 指向 GitHub</span>
+<span class="k-cmd">git</span> remote -v</code></pre>
+        </div>
+      </div>
+      <div class="tab-panel" data-panel="https">
+        <div class="code-wrap">
+          <button class="copy-btn">复制</button>
+<pre><code><span class="k-cmd">cd</span> /path/to
+<span class="k-cmd">git</span> clone https://github.com/jasonsue687/chip-backend-ai.git
+<span class="k-cmd">cd</span> chip-backend-ai</code></pre>
+        </div>
+      </div>
+
+      <p>克隆完成后，<b>本地完整路径</b>是：</p>
+      <div class="code-wrap">
+        <button class="copy-btn">复制</button>
+<pre><code>/path/to/chipcockpit/</code></pre>
+      </div>
+      <p>记住这个路径——下一步把它告诉 Claude Code。</p>
+
+      <div class="callout tip">
+        <div class="callout-title">👥 每个人一份独立目录</div>
+        团队里 5 个人就有 5 个独立的本地仓库：<code>.../dev-a/</code>、<code>.../dev-b/</code>、<code>.../dev-c/</code> …
+        互不影响。
+      </div>
+
+      <!-- ===== Plugin link to Claude Code ===== -->
+      <h3 id="plugin-link">2️⃣ 让 Claude Code 指向你的本地 plugin</h3>
+      <p>
+        这一步把刚才那个本地目录<b>注册</b>到 Claude Code 里，于是：
+      </p>
+      <ul>
+        <li>你<b>本地的改动</b>（Skill、Agent、router、workflow…）会被 Claude Code 立即读取；</li>
+        <li>之后在<b>项目开发</b>会话里使用 <code>/run-chip-flow</code> 等命令，跑的就是你最新版本；</li>
+        <li>这条链路就是「插件开发」和「项目开发」的<b>实际连接点</b>。</li>
+      </ul>
+
+      <h4>方式 A：让 Claude Code 帮你接入</h4>
+      <p>打开 Claude Code 会话窗口，直接说：</p>
+      <div class="chat">
+        <div class="chat-msg user">
+          <span class="who">👤 你（dev-a）</span>
+          我刚把 chip-backend-ai 仓库 clone 到本地了，路径是<br/>
+          <code>/path/to/chipcockpit/plugins/chip-backend-ai/</code><br/>
+          帮我把它注册成 plugin，并确认能用。
+        </div>
+        <div class="chat-msg ai">
+          <span class="who">🤖 Claude Code</span>
+          好的，我用 <code>/plugin</code> 命令把这个本地路径登记一下，然后列出你能调用的 Skill / Agent。<br/>
+          ✅ 注册成功。现在你可以使用：<br/>
+          <code>/run-chip-flow</code> · <code>/list-expert-topics</code> · <code>/read-expert-doc</code> ·
+          <code>/search-eda-command</code> · <code>/read-eda-concept</code> · <code>/pdf-to-markdown</code>
+        </div>
+      </div>
+
+      <h4>方式 B：自己用 <code>/plugin</code> 命令</h4>
+      <p>在 Claude Code 输入框敲：</p>
+      <div class="code-wrap">
+        <button class="copy-btn">复制</button>
+<pre><code>/plugin   <span class="k-cmt"># 然后按提示选择「本地路径」并填入下面这个路径</span>
+/path/to/chipcockpit/plugins/chip-backend-ai/</code></pre>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">⚠️ 注意路径必须到 <code>plugins/chip-backend-ai/</code> 这一层</div>
+        因为这一层目录下才有 <code>.claude-plugin/plugin.json</code>，那是 Claude Code 识别 plugin 的入口。
+        填到外层 git 仓库根目录是<b>识别不出来</b>的。
+      </div>
+
+      <h4>验证</h4>
+      <p>在 Claude Code 里随便输入 <code>/</code>，看下拉里有没有 <code>run-chip-flow</code> 等 Skill。
+      有就说明挂载成功；如果改了代码没生效，回会话里说「reload 一下 plugin」即可。</p>
+
+      <div class="callout tip">
+        <div class="callout-title">🔄 改完 plugin 代码后</div>
+        大多数 Skill / Agent 的 Markdown 改动是<b>即时生效</b>的。如果改了 Python 代码或者 plugin.json，
+        让 Claude Code 帮你 reload：「<i>帮我 reload 一下 chip-backend-ai plugin</i>」。
+      </div>
+
+      <!-- ===== Branch ===== -->
+      <h3 id="git-branch">3️⃣ 创建你的开发分支</h3>
+      <p>每个新任务都开<b>一个新分支</b>。不要在 <code>main</code> 上直接改代码。
+      你可以让 AI 帮你做，也可以自己跑命令。</p>
+
+      <div class="chat">
+        <div class="chat-msg user">
+          <span class="who">👤 你（dev-a）</span>
+          帮我从最新的 main 拉一个分支 <code>feat/dev-a-cts-skew</code> 出来。
+        </div>
+        <div class="chat-msg ai">
+          <span class="who">🤖 Claude Code</span>
+          好的，先同步 main，再开新分支：
+<pre><code>$ git checkout main
+$ git pull origin main
+$ git checkout -b feat/dev-a-cts-skew</code></pre>
+          ✅ 已切到 <code>feat/dev-a-cts-skew</code>，可以开始改代码了。
+        </div>
+      </div>
+
+      <details>
+        <summary>想自己敲命令？点开看</summary>
+        <div class="code-wrap">
+          <button class="copy-btn">复制</button>
+<pre><code><span class="k-cmd">git</span> checkout main
+<span class="k-cmd">git</span> pull origin main
+<span class="k-cmd">git</span> checkout -b feat/dev-a-cts-skew
+<span class="k-cmd">git</span> branch --show-current</code></pre>
+        </div>
+      </details>
+
+      <h4>分支命名规范</h4>
+      <p>核心要求：<b>前缀</b> + <b>你的用户名</b> + <b>短描述</b>，三段用 <code>-</code> 连。这样在 GitHub PR 列表里一眼能看出「谁在做什么」。</p>
+      <table>
+        <tr><th>前缀</th><th>用途</th><th>示例（用户 dev-a）</th></tr>
+        <tr><td><code>feat/</code></td><td>新功能</td><td><code>feat/dev-a-cts-skew</code></td></tr>
+        <tr><td><code>fix/</code></td><td>修 bug</td><td><code>fix/dev-a-router-traversal</code></td></tr>
+        <tr><td><code>docs/</code></td><td>文档</td><td><code>docs/dev-a-onboarding</code></td></tr>
+        <tr><td><code>refactor/</code></td><td>重构</td><td><code>refactor/dev-a-state-machine</code></td></tr>
+        <tr><td><code>chore/</code></td><td>琐事 / 配置</td><td><code>chore/dev-a-gitignore</code></td></tr>
+      </table>
+
+      <!-- ===== Commit ===== -->
+      <h3 id="git-commit">4️⃣ 改动代码 & 提交（让 AI 操作）</h3>
+
+      <p>
+        这是本流程<b>最常被使用的部分</b>。推荐做法：<b>你专注「改对代码」，把繁琐的 git 操作交给 Claude Code</b>。
+        AI 会主动检查 <code>git status</code> / <code>git diff</code>、起一个规范的 commit message、把命令打出来供你审核，再帮你执行。
+      </p>
+
+      <h4>典型对话</h4>
+
+      <div class="chat">
+        <div class="chat-msg user">
+          <span class="who">👤 你</span>
+          我刚改完 router.py 加了一段路径校验，防止 skill 文件名做路径穿越。帮我提交一下。
+        </div>
+        <div class="chat-msg ai">
+          <span class="who">🤖 Claude Code</span>
+          好的，先看一下当前改动 …
+<pre><code>$ git status
+$ git diff plugins/chip-backend-ai/core/router.py</code></pre>
+          我看到只改了 <code>router.py</code> 里的 <code>_safe_path()</code>。建议 commit message：<br/>
+          <code>fix(router): validate skill filename to prevent path traversal</code><br/>
+          要这样提交吗？
+        </div>
+        <div class="chat-msg user">
+          <span class="who">👤 你</span>
+          可以，提交吧。
+        </div>
+        <div class="chat-msg ai">
+          <span class="who">🤖 Claude Code</span>
+          ✅ 已提交：
+<pre><code>$ git add plugins/chip-backend-ai/core/router.py
+$ git commit -m "fix(router): validate skill filename to prevent path traversal"</code></pre>
+          当前分支 <code>feat/dev-a-router-fix</code>，共 1 个新提交。
+        </div>
+      </div>
+
+      <h4>你能这样自然地说</h4>
+      <ul>
+        <li>「<i>把我刚才所有改动提交一下，消息你看着写</i>」</li>
+        <li>「<i>只提交 docs/ 下的文件，先别动 plugins/</i>」</li>
+        <li>「<i>这次改了两件事，能拆成两个 commit 吗？</i>」</li>
+        <li>「<i>我想看一下没提交的改动</i>」（AI 会跑 <code>git status</code> + <code>git diff</code>）</li>
+        <li>「<i>刚才那个 commit message 不太对，帮我改成 …</i>」（只要还没 push，AI 会用 <code>--amend</code> 修；push 了的话再开新 commit）</li>
+      </ul>
+
+      <h4>AI 会代你遵守的规则</h4>
+      <ul class="checklist">
+        <li>会先跑 <code>git status</code> / <code>git diff</code>，确认改了什么再写 message</li>
+        <li>会按文件名 <code>git add</code>，不会盲目 <code>git add -A</code> 把敏感文件带进去</li>
+        <li>会按 Conventional Commit 风格起 message：<code>feat: …</code> / <code>fix: …</code> / <code>docs: …</code></li>
+        <li>commit message 第一行控制在 ≤ 70 字符，主要说<b>为什么</b>，不只是「做了什么」</li>
+        <li>对已 push 的 commit <b>不会</b> 用 <code>--amend</code>，避免污染别人的仓库</li>
+      </ul>
+
+      <div class="callout warn">
+        <div class="callout-title">⚠️ AI 也会请你确认</div>
+        碰到「删文件」「<code>git reset --hard</code>」「<code>--force</code>」这类有破坏性的操作，
+        Claude Code 会<b>先停下来问你</b>。看到提示<b>仔细读一遍</b>再点同意。
+      </div>
+
+      <!-- ===== Push & PR ===== -->
+      <h3 id="git-push">5️⃣ 推送 & 发起 PR（让 AI 操作）</h3>
+
+      <p>提交完，让 Claude Code 一气呵成把推送和 PR 都帮你搞定。</p>
+
+      <h4>一句话发 PR</h4>
+      <div class="chat">
+        <div class="chat-msg user">
+          <span class="who">👤 你（dev-a）</span>
+          把当前分支推到远端，然后帮我创建 PR，请 mentor 帮忙 review。
+        </div>
+        <div class="chat-msg ai">
+          <span class="who">🤖 Claude Code</span>
+          好的。当前分支 <code>feat/dev-a-router-fix</code>，还没有 upstream，我用 <code>-u</code> 建立追踪：
+<pre><code>$ git push -u origin feat/dev-a-router-fix</code></pre>
+          推送完成 ✓。<br/>
+          接着我看了一下这条分支与 main 的全部差异，准备 PR 描述：
+<pre><code>$ gh pr create \
+    --title "fix(router): validate skill filename to prevent path traversal" \
+    --body  "&lt;Summary + Test plan&gt;"</code></pre>
+          ✅ PR 已创建：<a href="#">https://github.com/jasonsue687/chip-backend-ai/pull/123</a><br/>
+          需要我帮你 <code>@mention</code> reviewer 吗？
+        </div>
+      </div>
+
+      <h4>之后的协作循环</h4>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">💬 回应 Review 意见</div>
+          <div class="card-body">
+            告诉 AI：「<i>把刚才的改动追加上，然后 push</i>」。
+            它会自动 <code>git add</code> + <code>commit</code> + <code>push</code>，PR 会自动同步。
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">🧹 合并后清理本地</div>
+          <div class="card-body">
+            PR 合并完，告诉 AI：「<i>main 同步一下，把已经合掉的分支删掉</i>」。
+            它会 <code>checkout main</code> → <code>pull</code> → <code>branch -d</code>。
+          </div>
+        </div>
+      </div>
+
+      <h4>常用句式</h4>
+      <ul>
+        <li>「<i>把当前分支 push 上去</i>」（首次会自动加 <code>-u</code>）</li>
+        <li>「<i>开一个 PR，标题 …，描述 …，base 是 main</i>」</li>
+        <li>「<i>看一下 CI 是不是过了</i>」（AI 会跑 <code>gh pr checks</code>）</li>
+        <li>「<i>review 通过了，把这个 PR 合掉</i>」（如果你有权限）</li>
+        <li>「<i>PR 合并后，清理一下我的本地分支</i>」</li>
+      </ul>
+
+      <div class="callout danger">
+        <div class="callout-title">⛔ AI 绝不会替你做的事</div>
+        <ul style="margin: 4px 0;">
+          <li>直接往 <code>main</code> 推（即使你这么要求，它会先警告）</li>
+          <li><code>--force</code> push 到主分支</li>
+          <li>跳过 pre-commit hook（<code>--no-verify</code>）</li>
+          <li>未经确认就删本地或远端分支</li>
+        </ul>
+      </div>
+
+      <details>
+        <summary>想自己用命令行做？点开看</summary>
+        <div class="code-wrap">
+          <button class="copy-btn">复制</button>
+<pre><code><span class="k-cmt"># 首次推送</span>
+<span class="k-cmd">git</span> push -u origin feat/dev-a-router-fix
+
+<span class="k-cmt"># 后续推送</span>
+<span class="k-cmd">git</span> push
+
+<span class="k-cmt"># 用 gh CLI 创建 PR</span>
+<span class="k-cmd">gh</span> pr create --title <span class="k-str">"fix(router): ..."</span> --body <span class="k-str">"..."</span>
+
+<span class="k-cmt"># 合并后清理</span>
+<span class="k-cmd">git</span> checkout main
+<span class="k-cmd">git</span> pull origin main
+<span class="k-cmd">git</span> branch -d feat/dev-a-router-fix
+<span class="k-cmd">git</span> push origin --delete feat/dev-a-router-fix</code></pre>
+        </div>
+      </details>
+
+      <!-- ===== Sync ===== -->
+      <h3 id="git-sync">6️⃣ 同步远端最新代码</h3>
+      <p>开发过程中，别人会不断把改动 merge 到 <code>main</code>。你要<b>定期把这些改动同步到自己分支</b>，避免 PR 时出现大段冲突。</p>
+
+      <div class="chat">
+        <div class="chat-msg user">
+          <span class="who">👤 你</span>
+          把 main 最新的改动 merge 到我当前分支上。
+        </div>
+        <div class="chat-msg ai">
+          <span class="who">🤖 Claude Code</span>
+          好的，我先拉远端，再 merge 到 <code>feat/dev-a-router-fix</code>：
+<pre><code>$ git fetch origin
+$ git merge origin/main</code></pre>
+          ✅ Fast-forward 合并完成，没有冲突。<br/>
+          （如果有冲突，我会停下来列出冲突文件，等你决定怎么合。）
+        </div>
+      </div>
+
+      <p>如果你想自己跑命令，两种方案都行：</p>
+
+      <div class="tabs" data-tabs="sync">
+        <button class="tab-btn active" data-tab="merge">方案 A: merge（推荐新人）</button>
+        <button class="tab-btn" data-tab="rebase">方案 B: rebase（高级）</button>
+      </div>
+      <div class="tab-panel active" data-panel="merge">
+        <div class="code-wrap">
+          <button class="copy-btn">复制</button>
+<pre><code><span class="k-cmt"># 站在你的开发分支上</span>
+<span class="k-cmd">git</span> fetch origin
+<span class="k-cmd">git</span> merge origin/main
+
+<span class="k-cmt"># 如果有冲突，编辑冲突文件后</span>
+<span class="k-cmd">git</span> add &lt;resolved files&gt;
+<span class="k-cmd">git</span> commit              <span class="k-cmt"># 用默认 merge message</span></code></pre>
+        </div>
+        <p>优点：操作简单，历史完整保留；缺点：会多出 merge commit。</p>
+      </div>
+      <div class="tab-panel" data-panel="rebase">
+        <div class="code-wrap">
+          <button class="copy-btn">复制</button>
+<pre><code><span class="k-cmd">git</span> fetch origin
+<span class="k-cmd">git</span> rebase origin/main
+
+<span class="k-cmt"># 冲突解决后</span>
+<span class="k-cmd">git</span> add &lt;resolved files&gt;
+<span class="k-cmd">git</span> rebase --continue
+
+<span class="k-cmt"># 已经 push 过的分支需要 force-with-lease 推</span>
+<span class="k-cmd">git</span> push --force-with-lease</code></pre>
+        </div>
+        <p>优点：历史线性、好读；缺点：<b>已 push 后必须 force push</b>，需要协作伙伴理解。</p>
+        <div class="callout danger">
+          <div class="callout-title">⛔ 永远不要在 main 上 rebase 或 force push</div>
+        </div>
+      </div>
+
+      <h3>处理冲突的小贴士</h3>
+      <ul>
+        <li>冲突文件里 Git 会插入 <code>&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD</code> / <code>=======</code> / <code>&gt;&gt;&gt;&gt;&gt;&gt;&gt;</code> 标记</li>
+        <li>选择保留哪边、或两边都要的合并结果，<b>删掉所有标记</b></li>
+        <li>用 <code>git status</code> 看还有哪些 unmerged paths</li>
+        <li>不确定的话<b>找冲突双方的作者一起决定</b>，不要凭感觉合</li>
+      </ul>
+    </section>
+
+    <!-- ============ Cheatsheet ============ -->
+    <section id="cheatsheet">
+      <h2>📋 Git 命令速查表</h2>
+      <table>
+        <tr><th>场景</th><th>命令</th></tr>
+        <tr><td>查看状态</td><td><code>git status</code></td></tr>
+        <tr><td>查看改动</td><td><code>git diff</code> / <code>git diff --staged</code></td></tr>
+        <tr><td>查看日志</td><td><code>git log --oneline --graph --all -20</code></td></tr>
+        <tr><td>查看当前分支</td><td><code>git branch --show-current</code></td></tr>
+        <tr><td>列出所有分支</td><td><code>git branch -a</code></td></tr>
+        <tr><td>切换分支</td><td><code>git checkout &lt;branch&gt;</code></td></tr>
+        <tr><td>新建并切换分支</td><td><code>git checkout -b &lt;branch&gt;</code></td></tr>
+        <tr><td>撤销工作区改动</td><td><code>git restore &lt;file&gt;</code></td></tr>
+        <tr><td>撤销 add（保留改动）</td><td><code>git restore --staged &lt;file&gt;</code></td></tr>
+        <tr><td>暂存当前改动</td><td><code>git stash</code> / <code>git stash pop</code></td></tr>
+        <tr><td>拉远端但不合并</td><td><code>git fetch origin</code></td></tr>
+        <tr><td>拉并合并</td><td><code>git pull origin main</code></td></tr>
+        <tr><td>推送当前分支</td><td><code>git push</code>（首次加 <code>-u origin &lt;branch&gt;</code>）</td></tr>
+        <tr><td>删本地分支</td><td><code>git branch -d &lt;branch&gt;</code></td></tr>
+        <tr><td>删远端分支</td><td><code>git push origin --delete &lt;branch&gt;</code></td></tr>
+        <tr><td>查看某次提交</td><td><code>git show &lt;sha&gt;</code></td></tr>
+        <tr><td>回退到某次提交（保留工作区）</td><td><code>git reset --mixed &lt;sha&gt;</code></td></tr>
+      </table>
+
+      <div class="callout danger">
+        <div class="callout-title">🚫 危险操作清单（用之前先问一句）</div>
+        <code>git reset --hard</code>、<code>git push --force</code>、<code>git clean -fd</code>、
+        <code>git branch -D</code>——它们会<b>不可逆地丢数据</b>。除非你 100% 清楚后果，否则先和团队确认。
+      </div>
+    </section>
+
+    <!-- ============ FAQ ============ -->
+    <section id="faq">
+      <h2>❓ 常见问题</h2>
+
+      <details>
+        <summary>Q1. 我应该把仓库 clone 到哪里？</summary>
+        <p>团队约定：<code>/path/to/&lt;your-username&gt;/chip-backend-ai/</code>。
+        例如用户 dev-a 就放在 <code>/path/to/chipcockpit/</code>。
+        路径里<b>不要</b>出现中文或空格。</p>
+      </details>
+
+      <details>
+        <summary>Q2. Claude Code 的 plugin 怎么指向我的本地仓库？</summary>
+        <p>在 Claude Code 会话里说「<i>帮我把这个本地路径注册成 plugin</i>」，
+        或直接用 <code>/plugin</code> 命令，注册到 <code>plugins/chip-backend-ai/</code> 这一层
+        （那一层有 <code>.claude-plugin/plugin.json</code>）。</p>
+        <p>完整路径示例（用户 dev-a）：</p>
+        <div class="code-wrap">
+          <button class="copy-btn">复制</button>
+<pre><code>/path/to/chipcockpit/plugins/chip-backend-ai/</code></pre>
+        </div>
+        <p>注册后，本地文件的任何修改都会被 Claude Code 立即看到（Python 改动需要 reload 一下）。</p>
+      </details>
+
+      <details>
+        <summary>Q2.1 「插件开发」和「项目开发」是怎么连起来的？</summary>
+        <p>就是通过上面这条路径：本地 git 仓库 → Claude Code plugin 注册 → 你的项目开发会话能用上你最新版本。
+        换句话说，你 push 到 GitHub 之前，<b>只有你自己</b>能用上这些改动；同事 <code>git pull</code> 拉到他自己的本地目录后，
+        他的 Claude Code 才会看到。</p>
+      </details>
+
+      <details>
+        <summary>Q3. 不小心在 main 上提交了怎么办？</summary>
+        <p>没 push 的话：</p>
+        <div class="code-wrap">
+          <button class="copy-btn">复制</button>
+<pre><code><span class="k-cmd">git</span> branch feat/your-fix       <span class="k-cmt"># 给当前 commit 打分支标签</span>
+<span class="k-cmd">git</span> reset --hard origin/main  <span class="k-cmt"># 把 main 拉回远端版本</span>
+<span class="k-cmd">git</span> checkout feat/your-fix
+<span class="k-cmd">git</span> push -u origin feat/your-fix</code></pre>
+        </div>
+        <p>已经 push 了：<b>立刻找团队 maintainer</b>，不要自己 force push。</p>
+      </details>
+
+      <details>
+        <summary>Q4. 我的 PR 卡了很久没人 review？</summary>
+        <p>① 在 PR 上 <code>@</code> 指定 reviewer；② 群里友好催一下；
+        ③ 确认 CI 通过、描述清晰。Reviewer 也是人，主动沟通永远比沉默有用。</p>
+      </details>
+
+      <details>
+        <summary>Q5. 我能直接修改别人的分支吗？</summary>
+        <p>原则上<b>不要</b>。除非对方明确请求你帮忙，并且你们约好了 push 节奏。
+        否则用 PR Review 留 comment / suggestion 是更礼貌的方式。</p>
+      </details>
+
+      <details>
+        <summary>Q6. <code>.gitignore</code> 里我能加自己的私人文件吗？</summary>
+        <p>请用<b>全局 gitignore</b>放个人偏好（如 IDE 配置）：</p>
+        <div class="code-wrap">
+          <button class="copy-btn">复制</button>
+<pre><code><span class="k-cmd">git</span> config --global core.excludesfile ~/.gitignore_global</code></pre>
+        </div>
+        <p>仓库的 <code>.gitignore</code> 只放<b>所有人都应该忽略</b>的内容（生成物、依赖目录等）。</p>
+      </details>
+
+      <details>
+        <summary>Q7. 提交时被 pre-commit hook 挡了怎么办？</summary>
+        <p>认真读报错信息，修好对应问题再 commit。<b>不要用 <code>--no-verify</code> 跳过</b>，
+        hook 拦的就是不该入库的内容。</p>
+      </details>
+
+      <details>
+        <summary>Q8. 想试一些会改 git 历史的操作，又怕搞坏？</summary>
+        <p>把当前分支用 <code>git branch backup-xxx</code> 备一份，再操作。
+        出问题就 <code>git reset --hard backup-xxx</code> 回滚。</p>
+      </details>
+    </section>
+
+    <!-- ============ Quiz ============ -->
+    <section id="quiz">
+      <h2>🧠 自检小测（3 题）</h2>
+      <p>都答对了说明你已经掌握了核心要点。</p>
+
+      <div class="quiz-card" data-quiz>
+        <div class="quiz-q">Q1. 关于「插件开发」和「项目开发」，下列说法正确的是？</div>
+        <div class="quiz-opts">
+          <button class="quiz-opt" data-correct="false">两者是同一件事，只是叫法不同</button>
+          <button class="quiz-opt" data-correct="true">前者是开发 chip-backend-ai 这个 plugin 本身；后者是「使用」这个 plugin 去跑某颗芯片的后端流程</button>
+          <button class="quiz-opt" data-correct="false">插件开发指的是写脚本，项目开发指的是写文档</button>
+          <button class="quiz-opt" data-correct="false">插件开发不需要 git，项目开发才需要</button>
+        </div>
+        <div class="quiz-feedback"></div>
+      </div>
+
+      <div class="quiz-card" data-quiz>
+        <div class="quiz-q">Q2. 关于多人协作，下列做法错误的是？</div>
+        <div class="quiz-opts">
+          <button class="quiz-opt" data-correct="false">每个人 clone 一份本地仓库，各自开分支开发</button>
+          <button class="quiz-opt" data-correct="false">改完代码先 push 到自己分支，再开 PR 让别人 review</button>
+          <button class="quiz-opt" data-correct="true">为了快，直接 <code>git push origin main</code> 把改动推到主分支</button>
+          <button class="quiz-opt" data-correct="false">PR 合并后，删掉自己的开发分支</button>
+        </div>
+        <div class="quiz-feedback"></div>
+      </div>
+
+      <div class="quiz-card" data-quiz>
+        <div class="quiz-q">Q3. 你已经 push 过 commit 后发现 message 写错了，应该？</div>
+        <div class="quiz-opts">
+          <button class="quiz-opt" data-correct="false">用 <code>git commit --amend</code> 改完再 force push</button>
+          <button class="quiz-opt" data-correct="true">再开一个新 commit 来修正，或者在 PR 描述里说明</button>
+          <button class="quiz-opt" data-correct="false">删掉远端分支重新建</button>
+          <button class="quiz-opt" data-correct="false">直接 <code>git reset --hard</code> 然后重做</button>
+        </div>
+        <div class="quiz-feedback"></div>
+      </div>
+    </section>
+
+    <hr/>
+
+    <p style="text-align:center; color: var(--fg-dim); font-size: 13px; padding-bottom: 40px;">
+      读完啦！🎉 有任何问题，找你的 mentor 或在团队群里发问 —— 别独自挣扎。<br/>
+      <small>本指南文件位置：<code>docs/onboarding.html</code> · 欢迎提 PR 改进它。</small>
+    </p>
+
+  </main>
+</div>
+
+<script>
+  // ===== Theme toggle =====
+  const themeBtn = document.getElementById('themeToggle');
+  const saved = localStorage.getItem('cb-theme');
+  if (saved) document.documentElement.setAttribute('data-theme', saved);
+  function updateBtn() {
+    const cur = document.documentElement.getAttribute('data-theme');
+    themeBtn.textContent = cur === 'light' ? '🌑 切换深色模式' : '🌙 切换浅色模式';
+  }
+  updateBtn();
+  themeBtn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme');
+    const next = cur === 'light' ? '' : 'light';
+    if (next) document.documentElement.setAttribute('data-theme', next);
+    else document.documentElement.removeAttribute('data-theme');
+    localStorage.setItem('cb-theme', next);
+    updateBtn();
+  });
+
+  // ===== Copy buttons =====
+  document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const pre = btn.parentElement.querySelector('pre');
+      const text = pre ? pre.innerText : '';
+      navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = '✓ 已复制';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = '复制';
+          btn.classList.remove('copied');
+        }, 1400);
+      });
+    });
+  });
+
+  // ===== Tabs =====
+  document.querySelectorAll('.tabs').forEach(tabs => {
+    const group = tabs.dataset.tabs;
+    tabs.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        tabs.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const target = btn.dataset.tab;
+        let next = tabs.nextElementSibling;
+        while (next && next.classList.contains('tab-panel')) {
+          next.classList.toggle('active', next.dataset.panel === target);
+          next = next.nextElementSibling;
+        }
+      });
+    });
+  });
+
+  // ===== Sidebar active highlight =====
+  const sections = document.querySelectorAll('main section[id]');
+  const navLinks = document.querySelectorAll('nav a[href^="#"]');
+  function onScroll() {
+    let cur = '';
+    sections.forEach(s => {
+      if (window.scrollY >= s.offsetTop - 120) cur = s.id;
+    });
+    navLinks.forEach(a => {
+      a.classList.toggle('active', a.getAttribute('href') === '#' + cur);
+    });
+    // progress bar
+    const h = document.documentElement;
+    const scrolled = (h.scrollTop) / (h.scrollHeight - h.clientHeight);
+    document.getElementById('progress').style.width = (scrolled * 100) + '%';
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  // ===== Quiz =====
+  document.querySelectorAll('[data-quiz]').forEach(card => {
+    const fb = card.querySelector('.quiz-feedback');
+    card.querySelectorAll('.quiz-opt').forEach(opt => {
+      opt.addEventListener('click', () => {
+        card.querySelectorAll('.quiz-opt').forEach(o => {
+          o.classList.remove('correct', 'wrong');
+          o.disabled = true;
+        });
+        const correct = opt.dataset.correct === 'true';
+        opt.classList.add(correct ? 'correct' : 'wrong');
+        if (!correct) {
+          card.querySelector('.quiz-opt[data-correct="true"]').classList.add('correct');
+        }
+        fb.textContent = correct
+          ? '✅ 正确！这正是协作流程的关键。'
+          : '❌ 不对哦——绿色那项才是正确答案，回去再读一遍对应章节吧。';
+        setTimeout(() => {
+          card.querySelectorAll('.quiz-opt').forEach(o => o.disabled = false);
+        }, 2500);
+      });
+    });
+  });
+</script>
+
+</body>
+</html>
