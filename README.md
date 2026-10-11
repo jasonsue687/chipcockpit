@@ -27,7 +27,7 @@ See [NOTICE](./NOTICE).
 ## Quick start
 
 ```bash
-git clone https://github.com/<your-org>/chipcockpit.git
+git clone https://github.com/jasonsue687/chipcockpit.git
 cd chipcockpit
 
 # Optional: install as a local Claude Code marketplace
